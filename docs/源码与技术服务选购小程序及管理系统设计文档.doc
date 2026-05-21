@@ -1,0 +1,1412 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>源码与技术服务选购小程序及管理系统设计文档</title>
+  <style>
+    @page { margin: 2.4cm 2.2cm; }
+    body { font-family: "Microsoft YaHei", "SimSun", Arial, sans-serif; font-size: 10.5pt; line-height: 1.75; color: #111; }
+    h1 { font-size: 22pt; text-align: center; margin: 28pt 0 18pt; font-weight: 700; }
+    h2 { font-size: 17pt; margin: 24pt 0 10pt; border-bottom: 1px solid #999; padding-bottom: 4pt; }
+    h3 { font-size: 14pt; margin: 18pt 0 8pt; }
+    h4 { font-size: 12pt; margin: 14pt 0 6pt; }
+    p { margin: 6pt 0; }
+    table { border-collapse: collapse; width: 100%; margin: 8pt 0 12pt; }
+    th, td { border: 1px solid #777; padding: 5pt 6pt; vertical-align: top; }
+    tr:first-child td { background: #f2f2f2; font-weight: 700; }
+    code { font-family: Consolas, monospace; background: #f5f5f5; padding: 1pt 3pt; }
+    pre { background: #f7f7f7; border: 1px solid #ddd; padding: 8pt; white-space: pre-wrap; word-break: break-all; }
+    ul, ol { margin: 6pt 0 6pt 20pt; }
+  </style>
+</head>
+<body>
+<h1>源码与技术服务选购小程序及管理系统设计文档</h1>
+<p>版本：V1.0  </p>
+<p>日期：2026-05-21  </p>
+<p>来源：基于《源码与技术服务选购小程序及管理系统需求文档 V2.0》整理  </p>
+<p>适用范围：客户端小程序、管理后台 Web、服务端 API、数据库、文件与消息服务</p>
+<h2>1. 文档说明</h2>
+<h3>1.1 建设目标</h3>
+<p>本设计文档用于指导“源码产品、软件成品、技术服务选购平台”的研发落地。系统面向个人运营场景，核心闭环为：</p>
+<ol>
+<li>管理员维护商品、服务、套餐、内容与配置。</li>
+<li>客户在小程序浏览、搜索、收藏、咨询、提交购买意向或定制需求。</li>
+<li>管理员跟进询单、报价、转订单。</li>
+<li>客户线下付款并上传凭证。</li>
+<li>管理员人工确认收款、维护交付资料、处理售后。</li>
+</ol>
+<h3>1.2 当前版本边界</h3>
+<p>当前版本不接入小程序在线支付、不做资金托管、不做第三方程序员入驻、不做竞标派单、不做钱包提现和分账。系统仅记录人工收款、交付和售后过程，并预留后续在线支付、自动发货、电子合同等扩展字段。</p>
+<h3>1.3 技术假设</h3>
+<table>
+<tr><td>项目</td><td>建议方案</td></tr>
+<tr><td>客户端</td><td>微信小程序</td></tr>
+<tr><td>管理后台</td><td>Vue / React 管理端均可</td></tr>
+<tr><td>服务端</td><td>Java Spring Boot / Node.js NestJS / PHP Laravel 均可，本文接口按 REST 设计</td></tr>
+<tr><td>数据库</td><td>MySQL 8.x</td></tr>
+<tr><td>缓存</td><td>Redis，可用于验证码、会话、热点配置、限流</td></tr>
+<tr><td>文件存储</td><td>对象存储，公开资源与私有交付资源分桶或分目录</td></tr>
+<tr><td>消息</td><td>站内信为必做，微信订阅消息为可选</td></tr>
+<tr><td>鉴权</td><td>客户端 JWT / Session Token，后台 JWT + RBAC</td></tr>
+</table>
+<h2>2. 总体架构</h2>
+<h3>2.1 系统组成</h3>
+<table>
+<tr><td>子系统</td><td>说明</td></tr>
+<tr><td>客户端小程序</td><td>首页、分类、搜索、商品/服务详情、询单、订单、付款凭证、交付、售后、消息、个人中心</td></tr>
+<tr><td>管理后台 Web</td><td>商品、服务、套餐、客户、询单、订单、收款、交付、售后、内容、配置、统计、权限</td></tr>
+<tr><td>服务端 API</td><td>提供客户端与后台统一业务接口</td></tr>
+<tr><td>数据库</td><td>保存用户、商品、服务、询单、订单、收款、交付、售后、权限、内容和统计数据</td></tr>
+<tr><td>文件服务</td><td>商品图片、附件、付款凭证、交付资料、售后截图</td></tr>
+<tr><td>消息服务</td><td>站内信、订阅消息、操作通知、待办提醒</td></tr>
+</table>
+<h3>2.2 逻辑架构</h3>
+<pre><code>
+微信小程序
+  |  HTTPS
+API 网关 / 应用服务
+  |-- 用户与认证模块
+  |-- 商品与服务模块
+  |-- 询单与订单模块
+  |-- 收款与交付模块
+  |-- 售后与评价模块
+  |-- 内容与消息模块
+  |-- 后台权限模块
+  |
+MySQL / Redis / 对象存储 / 微信服务
+  |
+管理后台 Web
+</code></pre>
+<h3>2.3 分层设计</h3>
+<table>
+<tr><td>层级</td><td>职责</td></tr>
+<tr><td>Controller/API 层</td><td>参数校验、鉴权、返回统一响应</td></tr>
+<tr><td>Service 业务层</td><td>状态流转、业务规则、事务处理、权限判断</td></tr>
+<tr><td>Repository/DAO 层</td><td>数据访问、查询组装、分页</td></tr>
+<tr><td>Integration 集成层</td><td>微信登录、订阅消息、对象存储、短信或客服工具</td></tr>
+<tr><td>Job 任务层</td><td>超时提醒、统计汇总、消息重试、临时文件清理</td></tr>
+</table>
+<h2>3. 核心业务设计</h2>
+<h3>3.1 商品购买流程</h3>
+<ol>
+<li>客户浏览商品详情并提交购买意向。</li>
+<li>系统生成询单，状态为 <code>pending_follow</code>。</li>
+<li>管理员沟通后报价，询单状态变为 <code>quoted</code>。</li>
+<li>客户确认后，管理员将询单转为订单，订单状态为 <code>pending_payment</code>。</li>
+<li>客户上传付款凭证，订单状态变为 <code>payment_confirming</code>。</li>
+<li>管理员确认收款，若全额收款则订单状态变为 <code>pending_delivery</code>。</li>
+<li>管理员添加交付记录，订单状态变为 <code>pending_acceptance</code> 或 <code>completed</code>。</li>
+<li>客户确认交付后订单完成，后续可发起售后。</li>
+</ol>
+<h3>3.2 服务预约流程</h3>
+<ol>
+<li>客户选择服务并填写问题说明、环境、截图和期望完成时间。</li>
+<li>系统生成服务类询单。</li>
+<li>管理员评估范围、报价并转订单。</li>
+<li>客户付款并上传凭证。</li>
+<li>管理员确认收款后，订单进入 <code>in_service</code>。</li>
+<li>服务完成后添加服务结果或交付说明，订单进入 <code>pending_acceptance</code>。</li>
+<li>客户确认后完成。</li>
+</ol>
+<h3>3.3 定制需求询价流程</h3>
+<ol>
+<li>客户提交定制需求。</li>
+<li>管理员记录沟通内容、报价、周期和下次跟进时间。</li>
+<li>达成一致后转订单。</li>
+<li>若分阶段交付，当前版本通过多笔收款记录和多条交付记录表达，不做资金托管。</li>
+</ol>
+<h3>3.4 收款确认规则</h3>
+<table>
+<tr><td>场景</td><td>处理规则</td></tr>
+<tr><td>客户上传凭证</td><td>创建收款记录，状态 <code>pending</code>，订单进入 <code>payment_confirming</code></td></tr>
+<tr><td>管理员确认到账</td><td>收款记录状态 <code>confirmed</code>，累计实收金额</td></tr>
+<tr><td>实收金额小于应收金额</td><td>订单付款状态 <code>partial_paid</code>，订单状态可保持 <code>partial_paid</code> 或继续待付款</td></tr>
+<tr><td>实收金额大于等于应收金额</td><td>订单付款状态 <code>paid</code>，订单进入待交付或服务中</td></tr>
+<tr><td>凭证无效</td><td>收款记录状态 <code>rejected</code>，记录驳回原因</td></tr>
+<tr><td>收款作废</td><td>仅超级管理员或有权限角色可操作，写操作日志</td></tr>
+</table>
+<h3>3.5 订单状态机</h3>
+<table>
+<tr><td>状态码</td><td>状态名</td><td>进入条件</td><td>可流转到</td></tr>
+<tr><td><code>pending_communication</code></td><td>待沟通</td><td>客户提交意向后生成订单，或询单转订单但未确认内容</td><td><code>pending_confirm</code>, <code>cancelled</code>, <code>closed</code></td></tr>
+<tr><td><code>pending_confirm</code></td><td>待确认</td><td>管理员已沟通，等待客户确认报价或购买内容</td><td><code>pending_payment</code>, <code>cancelled</code>, <code>closed</code></td></tr>
+<tr><td><code>pending_payment</code></td><td>待付款</td><td>订单金额已确认，等待客户付款</td><td><code>payment_confirming</code>, <code>partial_paid</code>, <code>cancelled</code></td></tr>
+<tr><td><code>payment_confirming</code></td><td>待确认收款</td><td>客户已上传付款凭证</td><td><code>pending_delivery</code>, <code>in_service</code>, <code>partial_paid</code>, <code>pending_payment</code>, <code>cancelled</code></td></tr>
+<tr><td><code>partial_paid</code></td><td>部分收款</td><td>已确认部分金额但未全额</td><td><code>payment_confirming</code>, <code>pending_delivery</code>, <code>in_service</code>, <code>cancelled</code></td></tr>
+<tr><td><code>pending_delivery</code></td><td>待交付</td><td>商品类订单已完成收款</td><td><code>pending_acceptance</code>, <code>completed</code>, <code>after_sales</code></td></tr>
+<tr><td><code>in_service</code></td><td>服务中</td><td>服务类订单已确认收款</td><td><code>pending_acceptance</code>, <code>after_sales</code>, <code>cancelled</code></td></tr>
+<tr><td><code>pending_acceptance</code></td><td>待验收</td><td>已添加交付或服务结果</td><td><code>completed</code>, <code>after_sales</code></td></tr>
+<tr><td><code>completed</code></td><td>已完成</td><td>客户确认或管理员确认完成</td><td><code>after_sales</code>, <code>closed</code></td></tr>
+<tr><td><code>after_sales</code></td><td>售后中</td><td>存在进行中的售后工单</td><td><code>completed</code>, <code>closed</code></td></tr>
+<tr><td><code>cancelled</code></td><td>已取消</td><td>客户或管理员取消</td><td><code>closed</code></td></tr>
+<tr><td><code>closed</code></td><td>已关闭</td><td>超时、失效或无需继续处理</td><td>无</td></tr>
+</table>
+<h2>4. 数据库设计</h2>
+<h3>4.1 设计约定</h3>
+<ol>
+<li>数据库字符集：<code>utf8mb4</code>。</li>
+<li>表引擎：<code>InnoDB</code>。</li>
+<li>主键：除特殊说明外使用 <code>bigint unsigned</code> 自增主键。</li>
+<li>金额：使用 <code>decimal(10,2)</code>，单位为元。</li>
+<li>时间：使用 <code>datetime</code>，服务端统一保存标准时间。</li>
+<li>软删除：业务主表建议使用 <code>deleted_at</code>。</li>
+<li>通用审计字段：<code>created_at</code>、<code>updated_at</code>、<code>created_by</code>、<code>updated_by</code>。</li>
+<li>状态、类型字段使用英文枚举码，前端展示由字典接口或本地映射转换。</li>
+</ol>
+<h3>4.2 客户表 <code>customers</code></h3>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>索引</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>PK</td><td>客户 ID</td></tr>
+<tr><td><code>openid</code></td><td>varchar(64)</td><td>否</td><td>UNIQUE</td><td>微信 OpenID</td></tr>
+<tr><td><code>unionid</code></td><td>varchar(64)</td><td>否</td><td>INDEX</td><td>微信 UnionID</td></tr>
+<tr><td><code>mobile</code></td><td>varchar(20)</td><td>否</td><td>INDEX</td><td>手机号</td></tr>
+<tr><td><code>nickname</code></td><td>varchar(64)</td><td>否</td><td></td><td>昵称</td></tr>
+<tr><td><code>avatar_url</code></td><td>varchar(500)</td><td>否</td><td></td><td>头像</td></tr>
+<tr><td><code>company_name</code></td><td>varchar(128)</td><td>否</td><td></td><td>公司名称</td></tr>
+<tr><td><code>contact_name</code></td><td>varchar(64)</td><td>否</td><td></td><td>联系人</td></tr>
+<tr><td><code>contact_wechat</code></td><td>varchar(64)</td><td>否</td><td></td><td>联系微信</td></tr>
+<tr><td><code>contact_address</code></td><td>varchar(255)</td><td>否</td><td></td><td>联系地址</td></tr>
+<tr><td><code>source</code></td><td>varchar(32)</td><td>否</td><td>INDEX</td><td>注册来源</td></tr>
+<tr><td><code>status</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td><code>normal</code> 正常，<code>disabled</code> 禁用，<code>cancelled</code> 注销</td></tr>
+<tr><td><code>last_visit_at</code></td><td>datetime</td><td>否</td><td></td><td>最后访问时间</td></tr>
+<tr><td><code>remark</code></td><td>varchar(500)</td><td>否</td><td></td><td>后台备注</td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td>INDEX</td><td>创建时间</td></tr>
+<tr><td><code>updated_at</code></td><td>datetime</td><td>是</td><td></td><td>更新时间</td></tr>
+<tr><td><code>deleted_at</code></td><td>datetime</td><td>否</td><td></td><td>删除时间</td></tr>
+</table>
+<h3>4.3 客户标签表 <code>customer_tags</code></h3>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>索引</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>PK</td><td>标签 ID</td></tr>
+<tr><td><code>name</code></td><td>varchar(50)</td><td>是</td><td>UNIQUE</td><td>标签名称</td></tr>
+<tr><td><code>color</code></td><td>varchar(20)</td><td>否</td><td></td><td>展示颜色</td></tr>
+<tr><td><code>sort_no</code></td><td>int</td><td>是</td><td></td><td>排序</td></tr>
+<tr><td><code>status</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td><code>enabled</code>，<code>disabled</code></td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td></td><td>创建时间</td></tr>
+<tr><td><code>updated_at</code></td><td>datetime</td><td>是</td><td></td><td>更新时间</td></tr>
+</table>
+<h3>4.4 客户标签关系表 <code>customer_tag_relations</code></h3>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>索引</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>PK</td><td>关系 ID</td></tr>
+<tr><td><code>customer_id</code></td><td>bigint unsigned</td><td>是</td><td>INDEX</td><td>客户 ID</td></tr>
+<tr><td><code>tag_id</code></td><td>bigint unsigned</td><td>是</td><td>INDEX</td><td>标签 ID</td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td></td><td>创建时间</td></tr>
+</table>
+<h3>4.5 后台用户表 <code>admin_users</code></h3>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>索引</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>PK</td><td>后台用户 ID</td></tr>
+<tr><td><code>username</code></td><td>varchar(64)</td><td>是</td><td>UNIQUE</td><td>登录名</td></tr>
+<tr><td><code>password_hash</code></td><td>varchar(255)</td><td>是</td><td></td><td>密码哈希</td></tr>
+<tr><td><code>real_name</code></td><td>varchar(64)</td><td>否</td><td></td><td>姓名</td></tr>
+<tr><td><code>mobile</code></td><td>varchar(20)</td><td>否</td><td></td><td>手机号</td></tr>
+<tr><td><code>email</code></td><td>varchar(128)</td><td>否</td><td></td><td>邮箱</td></tr>
+<tr><td><code>status</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td><code>enabled</code>，<code>disabled</code></td></tr>
+<tr><td><code>last_login_at</code></td><td>datetime</td><td>否</td><td></td><td>最近登录时间</td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td></td><td>创建时间</td></tr>
+<tr><td><code>updated_at</code></td><td>datetime</td><td>是</td><td></td><td>更新时间</td></tr>
+<tr><td><code>deleted_at</code></td><td>datetime</td><td>否</td><td></td><td>删除时间</td></tr>
+</table>
+<h3>4.6 角色与权限表</h3>
+<h4><code>admin_roles</code></h4>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>角色 ID</td></tr>
+<tr><td><code>code</code></td><td>varchar(64)</td><td>是</td><td>角色编码，如 <code>super_admin</code>、<code>operator</code>、<code>customer_service</code></td></tr>
+<tr><td><code>name</code></td><td>varchar(64)</td><td>是</td><td>角色名称</td></tr>
+<tr><td><code>description</code></td><td>varchar(255)</td><td>否</td><td>描述</td></tr>
+<tr><td><code>status</code></td><td>varchar(32)</td><td>是</td><td><code>enabled</code>，<code>disabled</code></td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td>创建时间</td></tr>
+<tr><td><code>updated_at</code></td><td>datetime</td><td>是</td><td>更新时间</td></tr>
+</table>
+<h4><code>admin_permissions</code></h4>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>权限 ID</td></tr>
+<tr><td><code>code</code></td><td>varchar(100)</td><td>是</td><td>权限编码，如 <code>product:create</code></td></tr>
+<tr><td><code>name</code></td><td>varchar(100)</td><td>是</td><td>权限名称</td></tr>
+<tr><td><code>type</code></td><td>varchar(32)</td><td>是</td><td><code>menu</code> 菜单，<code>action</code> 操作</td></tr>
+<tr><td><code>parent_id</code></td><td>bigint unsigned</td><td>否</td><td>父级权限</td></tr>
+<tr><td><code>path</code></td><td>varchar(255)</td><td>否</td><td>前端路由</td></tr>
+<tr><td><code>sort_no</code></td><td>int</td><td>是</td><td>排序</td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td>创建时间</td></tr>
+<tr><td><code>updated_at</code></td><td>datetime</td><td>是</td><td>更新时间</td></tr>
+</table>
+<h4><code>admin_user_roles</code> / <code>admin_role_permissions</code></h4>
+<table>
+<tr><td>表名</td><td>关键字段</td><td>说明</td></tr>
+<tr><td><code>admin_user_roles</code></td><td><code>admin_user_id</code>，<code>role_id</code></td><td>用户角色关系</td></tr>
+<tr><td><code>admin_role_permissions</code></td><td><code>role_id</code>，<code>permission_id</code></td><td>角色权限关系</td></tr>
+</table>
+<h3>4.7 分类表 <code>categories</code></h3>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>索引</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>PK</td><td>分类 ID</td></tr>
+<tr><td><code>parent_id</code></td><td>bigint unsigned</td><td>否</td><td>INDEX</td><td>父级分类</td></tr>
+<tr><td><code>type</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td><code>product</code> 商品，<code>service</code> 服务，<code>article</code> 文章</td></tr>
+<tr><td><code>name</code></td><td>varchar(64)</td><td>是</td><td>INDEX</td><td>分类名称</td></tr>
+<tr><td><code>icon_url</code></td><td>varchar(500)</td><td>否</td><td></td><td>图标</td></tr>
+<tr><td><code>share_title</code></td><td>varchar(128)</td><td>否</td><td></td><td>分享标题</td></tr>
+<tr><td><code>share_desc</code></td><td>varchar(255)</td><td>否</td><td></td><td>分享描述</td></tr>
+<tr><td><code>is_home_visible</code></td><td>tinyint(1)</td><td>是</td><td></td><td>是否首页展示</td></tr>
+<tr><td><code>sort_no</code></td><td>int</td><td>是</td><td>INDEX</td><td>排序</td></tr>
+<tr><td><code>status</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td><code>enabled</code>，<code>disabled</code></td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td></td><td>创建时间</td></tr>
+<tr><td><code>updated_at</code></td><td>datetime</td><td>是</td><td></td><td>更新时间</td></tr>
+<tr><td><code>deleted_at</code></td><td>datetime</td><td>否</td><td></td><td>删除时间</td></tr>
+</table>
+<h3>4.8 标签表 <code>tags</code></h3>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>索引</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>PK</td><td>标签 ID</td></tr>
+<tr><td><code>type</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td><code>tech</code> 技术，<code>industry</code> 行业，<code>service</code> 服务，<code>marketing</code> 营销</td></tr>
+<tr><td><code>name</code></td><td>varchar(64)</td><td>是</td><td>INDEX</td><td>标签名称</td></tr>
+<tr><td><code>is_hot</code></td><td>tinyint(1)</td><td>是</td><td>INDEX</td><td>是否热门</td></tr>
+<tr><td><code>sort_no</code></td><td>int</td><td>是</td><td></td><td>排序</td></tr>
+<tr><td><code>status</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td><code>enabled</code>，<code>disabled</code></td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td></td><td>创建时间</td></tr>
+<tr><td><code>updated_at</code></td><td>datetime</td><td>是</td><td></td><td>更新时间</td></tr>
+</table>
+<h3>4.9 商品表 <code>products</code></h3>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>索引</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>PK</td><td>商品 ID</td></tr>
+<tr><td><code>category_id</code></td><td>bigint unsigned</td><td>是</td><td>INDEX</td><td>分类 ID</td></tr>
+<tr><td><code>title</code></td><td>varchar(128)</td><td>是</td><td>INDEX</td><td>商品标题</td></tr>
+<tr><td><code>subtitle</code></td><td>varchar(255)</td><td>否</td><td></td><td>副标题</td></tr>
+<tr><td><code>cover_url</code></td><td>varchar(500)</td><td>否</td><td></td><td>封面图</td></tr>
+<tr><td><code>price</code></td><td>decimal(10,2)</td><td>否</td><td>INDEX</td><td>标准价</td></tr>
+<tr><td><code>origin_price</code></td><td>decimal(10,2)</td><td>否</td><td></td><td>原价</td></tr>
+<tr><td><code>start_price</code></td><td>decimal(10,2)</td><td>否</td><td></td><td>起售价</td></tr>
+<tr><td><code>price_text</code></td><td>varchar(100)</td><td>否</td><td></td><td>价格说明，如“需询价”</td></tr>
+<tr><td><code>is_deploy_included</code></td><td>tinyint(1)</td><td>是</td><td></td><td>是否包含部署</td></tr>
+<tr><td><code>is_customizable</code></td><td>tinyint(1)</td><td>是</td><td></td><td>是否支持二开</td></tr>
+<tr><td><code>has_demo</code></td><td>tinyint(1)</td><td>是</td><td>INDEX</td><td>是否有演示</td></tr>
+<tr><td><code>demo_url</code></td><td>varchar(500)</td><td>否</td><td></td><td>演示地址</td></tr>
+<tr><td><code>demo_account</code></td><td>varchar(500)</td><td>否</td><td></td><td>演示账号说明</td></tr>
+<tr><td><code>tech_stack</code></td><td>varchar(500)</td><td>否</td><td></td><td>技术栈摘要</td></tr>
+<tr><td><code>frontend_stack</code></td><td>varchar(255)</td><td>否</td><td></td><td>前端技术</td></tr>
+<tr><td><code>backend_stack</code></td><td>varchar(255)</td><td>否</td><td></td><td>后端技术</td></tr>
+<tr><td><code>database_stack</code></td><td>varchar(255)</td><td>否</td><td></td><td>数据库</td></tr>
+<tr><td><code>deploy_env</code></td><td>varchar(500)</td><td>否</td><td></td><td>部署环境</td></tr>
+<tr><td><code>feature_intro</code></td><td>text</td><td>否</td><td></td><td>功能介绍</td></tr>
+<tr><td><code>feature_list</code></td><td>json</td><td>否</td><td></td><td>功能清单</td></tr>
+<tr><td><code>delivery_content</code></td><td>text</td><td>否</td><td></td><td>交付内容</td></tr>
+<tr><td><code>purchase_notice</code></td><td>text</td><td>否</td><td></td><td>购买须知</td></tr>
+<tr><td><code>after_sale_desc</code></td><td>text</td><td>否</td><td></td><td>售后说明</td></tr>
+<tr><td><code>license_desc</code></td><td>text</td><td>否</td><td></td><td>授权说明</td></tr>
+<tr><td><code>status</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td><code>draft</code>，<code>on_sale</code>，<code>off_sale</code>，<code>sold_out</code>，<code>hidden</code></td></tr>
+<tr><td><code>is_new</code></td><td>tinyint(1)</td><td>是</td><td>INDEX</td><td>新品</td></tr>
+<tr><td><code>is_hot</code></td><td>tinyint(1)</td><td>是</td><td>INDEX</td><td>热门</td></tr>
+<tr><td><code>is_recommended</code></td><td>tinyint(1)</td><td>是</td><td>INDEX</td><td>首页推荐</td></tr>
+<tr><td><code>view_count</code></td><td>int unsigned</td><td>是</td><td></td><td>浏览量</td></tr>
+<tr><td><code>favorite_count</code></td><td>int unsigned</td><td>是</td><td></td><td>收藏量</td></tr>
+<tr><td><code>deal_count</code></td><td>int unsigned</td><td>是</td><td></td><td>成交量</td></tr>
+<tr><td><code>sort_no</code></td><td>int</td><td>是</td><td>INDEX</td><td>排序</td></tr>
+<tr><td><code>published_at</code></td><td>datetime</td><td>否</td><td>INDEX</td><td>上架时间</td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td></td><td>创建时间</td></tr>
+<tr><td><code>updated_at</code></td><td>datetime</td><td>是</td><td></td><td>更新时间</td></tr>
+<tr><td><code>deleted_at</code></td><td>datetime</td><td>否</td><td></td><td>删除时间</td></tr>
+</table>
+<h3>4.10 商品附属表</h3>
+<h4>商品图片表 <code>product_images</code></h4>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>图片 ID</td></tr>
+<tr><td><code>product_id</code></td><td>bigint unsigned</td><td>是</td><td>商品 ID</td></tr>
+<tr><td><code>type</code></td><td>varchar(32)</td><td>是</td><td><code>banner</code> 轮播，<code>screenshot</code> 截图，<code>backend</code> 后台截图</td></tr>
+<tr><td><code>url</code></td><td>varchar(500)</td><td>是</td><td>图片地址</td></tr>
+<tr><td><code>title</code></td><td>varchar(100)</td><td>否</td><td>图片标题</td></tr>
+<tr><td><code>sort_no</code></td><td>int</td><td>是</td><td>排序</td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td>创建时间</td></tr>
+</table>
+<h4>商品标签关系表 <code>product_tag_relations</code></h4>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>关系 ID</td></tr>
+<tr><td><code>product_id</code></td><td>bigint unsigned</td><td>是</td><td>商品 ID</td></tr>
+<tr><td><code>tag_id</code></td><td>bigint unsigned</td><td>是</td><td>标签 ID</td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td>创建时间</td></tr>
+</table>
+<h4>商品 FAQ 表 <code>product_faqs</code></h4>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>FAQ ID</td></tr>
+<tr><td><code>product_id</code></td><td>bigint unsigned</td><td>是</td><td>商品 ID</td></tr>
+<tr><td><code>question</code></td><td>varchar(255)</td><td>是</td><td>问题</td></tr>
+<tr><td><code>answer</code></td><td>text</td><td>是</td><td>回答</td></tr>
+<tr><td><code>sort_no</code></td><td>int</td><td>是</td><td>排序</td></tr>
+<tr><td><code>status</code></td><td>varchar(32)</td><td>是</td><td><code>enabled</code>，<code>disabled</code></td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td>创建时间</td></tr>
+<tr><td><code>updated_at</code></td><td>datetime</td><td>是</td><td>更新时间</td></tr>
+</table>
+<h3>4.11 服务表 <code>services</code></h3>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>索引</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>PK</td><td>服务 ID</td></tr>
+<tr><td><code>category_id</code></td><td>bigint unsigned</td><td>是</td><td>INDEX</td><td>分类 ID</td></tr>
+<tr><td><code>name</code></td><td>varchar(128)</td><td>是</td><td>INDEX</td><td>服务名称</td></tr>
+<tr><td><code>subtitle</code></td><td>varchar(255)</td><td>否</td><td></td><td>服务简介</td></tr>
+<tr><td><code>cover_url</code></td><td>varchar(500)</td><td>否</td><td></td><td>封面</td></tr>
+<tr><td><code>start_price</code></td><td>decimal(10,2)</td><td>否</td><td>INDEX</td><td>起步价</td></tr>
+<tr><td><code>price_text</code></td><td>varchar(100)</td><td>否</td><td></td><td>价格说明</td></tr>
+<tr><td><code>service_period</code></td><td>varchar(100)</td><td>否</td><td></td><td>服务周期</td></tr>
+<tr><td><code>service_method</code></td><td>varchar(100)</td><td>否</td><td></td><td>服务方式，如远程、线上沟通</td></tr>
+<tr><td><code>service_scope</code></td><td>text</td><td>否</td><td></td><td>服务范围</td></tr>
+<tr><td><code>service_process</code></td><td>text</td><td>否</td><td></td><td>服务流程</td></tr>
+<tr><td><code>required_materials</code></td><td>text</td><td>否</td><td></td><td>客户需提供资料</td></tr>
+<tr><td><code>delivery_standard</code></td><td>text</td><td>否</td><td></td><td>交付标准</td></tr>
+<tr><td><code>excluded_content</code></td><td>text</td><td>否</td><td></td><td>不包含内容</td></tr>
+<tr><td><code>after_sale_desc</code></td><td>text</td><td>否</td><td></td><td>售后说明</td></tr>
+<tr><td><code>response_time</code></td><td>varchar(100)</td><td>否</td><td></td><td>响应时间</td></tr>
+<tr><td><code>status</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td><code>draft</code>，<code>on_sale</code>，<code>off_sale</code></td></tr>
+<tr><td><code>view_count</code></td><td>int unsigned</td><td>是</td><td></td><td>浏览量</td></tr>
+<tr><td><code>favorite_count</code></td><td>int unsigned</td><td>是</td><td></td><td>收藏量</td></tr>
+<tr><td><code>deal_count</code></td><td>int unsigned</td><td>是</td><td></td><td>成交量</td></tr>
+<tr><td><code>sort_no</code></td><td>int</td><td>是</td><td>INDEX</td><td>排序</td></tr>
+<tr><td><code>published_at</code></td><td>datetime</td><td>否</td><td></td><td>上架时间</td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td></td><td>创建时间</td></tr>
+<tr><td><code>updated_at</code></td><td>datetime</td><td>是</td><td></td><td>更新时间</td></tr>
+<tr><td><code>deleted_at</code></td><td>datetime</td><td>否</td><td></td><td>删除时间</td></tr>
+</table>
+<h3>4.12 服务套餐表 <code>service_packages</code></h3>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>套餐 ID</td></tr>
+<tr><td><code>service_id</code></td><td>bigint unsigned</td><td>是</td><td>服务 ID</td></tr>
+<tr><td><code>name</code></td><td>varchar(100)</td><td>是</td><td>套餐名称，如基础版</td></tr>
+<tr><td><code>price</code></td><td>decimal(10,2)</td><td>否</td><td>套餐价格</td></tr>
+<tr><td><code>content</code></td><td>text</td><td>否</td><td>包含内容</td></tr>
+<tr><td><code>delivery_standard</code></td><td>text</td><td>否</td><td>交付标准</td></tr>
+<tr><td><code>sort_no</code></td><td>int</td><td>是</td><td>排序</td></tr>
+<tr><td><code>status</code></td><td>varchar(32)</td><td>是</td><td><code>enabled</code>，<code>disabled</code></td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td>创建时间</td></tr>
+<tr><td><code>updated_at</code></td><td>datetime</td><td>是</td><td>更新时间</td></tr>
+</table>
+<h3>4.13 组合套餐表 <code>bundles</code></h3>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>索引</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>PK</td><td>组合套餐 ID</td></tr>
+<tr><td><code>name</code></td><td>varchar(128)</td><td>是</td><td>INDEX</td><td>套餐名称</td></tr>
+<tr><td><code>cover_url</code></td><td>varchar(500)</td><td>否</td><td></td><td>封面</td></tr>
+<tr><td><code>price</code></td><td>decimal(10,2)</td><td>是</td><td></td><td>套餐价格</td></tr>
+<tr><td><code>origin_price</code></td><td>decimal(10,2)</td><td>否</td><td></td><td>原价</td></tr>
+<tr><td><code>description</code></td><td>text</td><td>否</td><td></td><td>套餐说明</td></tr>
+<tr><td><code>suitable_scene</code></td><td>text</td><td>否</td><td></td><td>适用场景</td></tr>
+<tr><td><code>purchase_notice</code></td><td>text</td><td>否</td><td></td><td>购买须知</td></tr>
+<tr><td><code>status</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td><code>draft</code>，<code>on_sale</code>，<code>off_sale</code></td></tr>
+<tr><td><code>is_recommended</code></td><td>tinyint(1)</td><td>是</td><td>INDEX</td><td>是否推荐</td></tr>
+<tr><td><code>sort_no</code></td><td>int</td><td>是</td><td></td><td>排序</td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td></td><td>创建时间</td></tr>
+<tr><td><code>updated_at</code></td><td>datetime</td><td>是</td><td></td><td>更新时间</td></tr>
+<tr><td><code>deleted_at</code></td><td>datetime</td><td>否</td><td></td><td>删除时间</td></tr>
+</table>
+<h4>套餐明细表 <code>bundle_items</code></h4>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>明细 ID</td></tr>
+<tr><td><code>bundle_id</code></td><td>bigint unsigned</td><td>是</td><td>套餐 ID</td></tr>
+<tr><td><code>item_type</code></td><td>varchar(32)</td><td>是</td><td><code>product</code>，<code>service</code></td></tr>
+<tr><td><code>item_id</code></td><td>bigint unsigned</td><td>是</td><td>商品或服务 ID</td></tr>
+<tr><td><code>quantity</code></td><td>int</td><td>是</td><td>数量</td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td>创建时间</td></tr>
+</table>
+<h3>4.14 询单表 <code>inquiries</code></h3>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>索引</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>PK</td><td>询单 ID</td></tr>
+<tr><td><code>inquiry_no</code></td><td>varchar(32)</td><td>是</td><td>UNIQUE</td><td>询单号</td></tr>
+<tr><td><code>customer_id</code></td><td>bigint unsigned</td><td>是</td><td>INDEX</td><td>客户 ID</td></tr>
+<tr><td><code>source_type</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td><code>product</code>，<code>service</code>，<code>custom</code>，<code>bundle</code></td></tr>
+<tr><td><code>source_id</code></td><td>bigint unsigned</td><td>否</td><td>INDEX</td><td>来源对象 ID</td></tr>
+<tr><td><code>title</code></td><td>varchar(128)</td><td>是</td><td>INDEX</td><td>询单标题</td></tr>
+<tr><td><code>demand_type</code></td><td>varchar(32)</td><td>否</td><td>INDEX</td><td>需求类型</td></tr>
+<tr><td><code>description</code></td><td>text</td><td>否</td><td></td><td>需求描述</td></tr>
+<tr><td><code>contact_name</code></td><td>varchar(64)</td><td>否</td><td></td><td>联系人</td></tr>
+<tr><td><code>contact_mobile</code></td><td>varchar(20)</td><td>否</td><td></td><td>联系电话</td></tr>
+<tr><td><code>contact_wechat</code></td><td>varchar(64)</td><td>否</td><td></td><td>联系微信</td></tr>
+<tr><td><code>budget_min</code></td><td>decimal(10,2)</td><td>否</td><td></td><td>最低预算</td></tr>
+<tr><td><code>budget_max</code></td><td>decimal(10,2)</td><td>否</td><td></td><td>最高预算</td></tr>
+<tr><td><code>expected_finish_at</code></td><td>datetime</td><td>否</td><td></td><td>期望完成时间</td></tr>
+<tr><td><code>quote_amount</code></td><td>decimal(10,2)</td><td>否</td><td></td><td>报价金额</td></tr>
+<tr><td><code>quote_desc</code></td><td>text</td><td>否</td><td></td><td>报价说明</td></tr>
+<tr><td><code>priority</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td><code>low</code>，<code>normal</code>，<code>high</code>，<code>urgent</code></td></tr>
+<tr><td><code>status</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td><code>pending_follow</code>，<code>contacted</code>，<code>pending_quote</code>，<code>quoted</code>，<code>converted</code>，<code>invalid</code>，<code>closed</code></td></tr>
+<tr><td><code>assignee_id</code></td><td>bigint unsigned</td><td>否</td><td>INDEX</td><td>跟进人</td></tr>
+<tr><td><code>next_follow_at</code></td><td>datetime</td><td>否</td><td>INDEX</td><td>下次跟进时间</td></tr>
+<tr><td><code>converted_order_id</code></td><td>bigint unsigned</td><td>否</td><td>INDEX</td><td>转化订单 ID</td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td>INDEX</td><td>创建时间</td></tr>
+<tr><td><code>updated_at</code></td><td>datetime</td><td>是</td><td></td><td>更新时间</td></tr>
+<tr><td><code>deleted_at</code></td><td>datetime</td><td>否</td><td></td><td>删除时间</td></tr>
+</table>
+<h3>4.15 询单跟进表 <code>inquiry_follow_logs</code></h3>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>跟进 ID</td></tr>
+<tr><td><code>inquiry_id</code></td><td>bigint unsigned</td><td>是</td><td>询单 ID</td></tr>
+<tr><td><code>admin_user_id</code></td><td>bigint unsigned</td><td>是</td><td>跟进人</td></tr>
+<tr><td><code>content</code></td><td>text</td><td>是</td><td>跟进内容</td></tr>
+<tr><td><code>next_follow_at</code></td><td>datetime</td><td>否</td><td>下次跟进时间</td></tr>
+<tr><td><code>attachments</code></td><td>json</td><td>否</td><td>附件列表</td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td>创建时间</td></tr>
+</table>
+<h3>4.16 订单表 <code>orders</code></h3>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>索引</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>PK</td><td>订单 ID</td></tr>
+<tr><td><code>order_no</code></td><td>varchar(32)</td><td>是</td><td>UNIQUE</td><td>订单号</td></tr>
+<tr><td><code>customer_id</code></td><td>bigint unsigned</td><td>是</td><td>INDEX</td><td>客户 ID</td></tr>
+<tr><td><code>inquiry_id</code></td><td>bigint unsigned</td><td>否</td><td>INDEX</td><td>来源询单</td></tr>
+<tr><td><code>source_type</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td><code>product</code>，<code>service</code>，<code>custom</code>，<code>bundle</code>，<code>manual</code></td></tr>
+<tr><td><code>title</code></td><td>varchar(128)</td><td>是</td><td>INDEX</td><td>订单标题</td></tr>
+<tr><td><code>total_amount</code></td><td>decimal(10,2)</td><td>是</td><td></td><td>订单总额</td></tr>
+<tr><td><code>discount_amount</code></td><td>decimal(10,2)</td><td>是</td><td></td><td>优惠金额</td></tr>
+<tr><td><code>extra_amount</code></td><td>decimal(10,2)</td><td>是</td><td></td><td>补充费用</td></tr>
+<tr><td><code>payable_amount</code></td><td>decimal(10,2)</td><td>是</td><td></td><td>应收金额</td></tr>
+<tr><td><code>paid_amount</code></td><td>decimal(10,2)</td><td>是</td><td></td><td>已收金额</td></tr>
+<tr><td><code>payment_status</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td><code>unpaid</code>，<code>partial_paid</code>，<code>paid</code>，<code>refunded</code></td></tr>
+<tr><td><code>delivery_status</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td><code>not_started</code>，<code>partial_delivered</code>，<code>delivered</code>，<code>confirmed</code></td></tr>
+<tr><td><code>after_sale_status</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td><code>none</code>，<code>processing</code>，<code>closed</code></td></tr>
+<tr><td><code>status</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td>订单状态码，见状态机</td></tr>
+<tr><td><code>payment_instruction</code></td><td>text</td><td>否</td><td></td><td>付款说明</td></tr>
+<tr><td><code>customer_remark</code></td><td>text</td><td>否</td><td></td><td>客户可见备注</td></tr>
+<tr><td><code>internal_remark</code></td><td>text</td><td>否</td><td></td><td>内部备注</td></tr>
+<tr><td><code>confirmed_at</code></td><td>datetime</td><td>否</td><td></td><td>订单确认时间</td></tr>
+<tr><td><code>paid_at</code></td><td>datetime</td><td>否</td><td></td><td>全额收款时间</td></tr>
+<tr><td><code>completed_at</code></td><td>datetime</td><td>否</td><td></td><td>完成时间</td></tr>
+<tr><td><code>cancelled_at</code></td><td>datetime</td><td>否</td><td></td><td>取消时间</td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td>INDEX</td><td>创建时间</td></tr>
+<tr><td><code>updated_at</code></td><td>datetime</td><td>是</td><td></td><td>更新时间</td></tr>
+<tr><td><code>deleted_at</code></td><td>datetime</td><td>否</td><td></td><td>删除时间</td></tr>
+</table>
+<h3>4.17 订单明细表 <code>order_items</code></h3>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>索引</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>PK</td><td>明细 ID</td></tr>
+<tr><td><code>order_id</code></td><td>bigint unsigned</td><td>是</td><td>INDEX</td><td>订单 ID</td></tr>
+<tr><td><code>item_type</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td><code>product</code>，<code>service</code>，<code>bundle</code>，<code>custom_service</code></td></tr>
+<tr><td><code>item_id</code></td><td>bigint unsigned</td><td>否</td><td>INDEX</td><td>关联对象 ID</td></tr>
+<tr><td><code>item_name</code></td><td>varchar(128)</td><td>是</td><td></td><td>名称快照</td></tr>
+<tr><td><code>unit_price</code></td><td>decimal(10,2)</td><td>是</td><td></td><td>单价</td></tr>
+<tr><td><code>quantity</code></td><td>int</td><td>是</td><td></td><td>数量</td></tr>
+<tr><td><code>total_amount</code></td><td>decimal(10,2)</td><td>是</td><td></td><td>小计</td></tr>
+<tr><td><code>snapshot</code></td><td>json</td><td>否</td><td></td><td>下单时商品/服务快照</td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td></td><td>创建时间</td></tr>
+</table>
+<h3>4.18 收款记录表 <code>payment_records</code></h3>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>索引</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>PK</td><td>收款 ID</td></tr>
+<tr><td><code>payment_no</code></td><td>varchar(32)</td><td>是</td><td>UNIQUE</td><td>收款记录号</td></tr>
+<tr><td><code>order_id</code></td><td>bigint unsigned</td><td>是</td><td>INDEX</td><td>订单 ID</td></tr>
+<tr><td><code>customer_id</code></td><td>bigint unsigned</td><td>是</td><td>INDEX</td><td>客户 ID</td></tr>
+<tr><td><code>amount</code></td><td>decimal(10,2)</td><td>是</td><td></td><td>收款金额</td></tr>
+<tr><td><code>payment_method</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td><code>wechat_transfer</code>，<code>alipay_transfer</code>，<code>bank_transfer</code>，<code>corporate_transfer</code>，<code>other</code></td></tr>
+<tr><td><code>paid_at</code></td><td>datetime</td><td>否</td><td></td><td>客户填写付款时间</td></tr>
+<tr><td><code>receiver_account</code></td><td>varchar(128)</td><td>否</td><td></td><td>收款账号</td></tr>
+<tr><td><code>transaction_no</code></td><td>varchar(128)</td><td>否</td><td>INDEX</td><td>交易流水号</td></tr>
+<tr><td><code>voucher_file_id</code></td><td>bigint unsigned</td><td>否</td><td></td><td>付款凭证文件</td></tr>
+<tr><td><code>status</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td><code>pending</code>，<code>confirmed</code>，<code>rejected</code>，<code>voided</code></td></tr>
+<tr><td><code>reject_reason</code></td><td>varchar(255)</td><td>否</td><td></td><td>驳回原因</td></tr>
+<tr><td><code>confirmed_by</code></td><td>bigint unsigned</td><td>否</td><td></td><td>确认人</td></tr>
+<tr><td><code>confirmed_at</code></td><td>datetime</td><td>否</td><td></td><td>确认时间</td></tr>
+<tr><td><code>remark</code></td><td>varchar(500)</td><td>否</td><td></td><td>备注</td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td>INDEX</td><td>创建时间</td></tr>
+<tr><td><code>updated_at</code></td><td>datetime</td><td>是</td><td></td><td>更新时间</td></tr>
+</table>
+<h3>4.19 交付记录表 <code>delivery_records</code></h3>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>索引</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>PK</td><td>交付 ID</td></tr>
+<tr><td><code>delivery_no</code></td><td>varchar(32)</td><td>是</td><td>UNIQUE</td><td>交付编号</td></tr>
+<tr><td><code>order_id</code></td><td>bigint unsigned</td><td>是</td><td>INDEX</td><td>订单 ID</td></tr>
+<tr><td><code>type</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td><code>source_file</code>，<code>netdisk</code>，<code>git_repo</code>，<code>deploy_info</code>，<code>account</code>，<code>document</code>，<code>remote_service</code></td></tr>
+<tr><td><code>title</code></td><td>varchar(128)</td><td>是</td><td></td><td>交付标题</td></tr>
+<tr><td><code>content</code></td><td>text</td><td>否</td><td></td><td>交付内容，可加密保存敏感信息</td></tr>
+<tr><td><code>attachments</code></td><td>json</td><td>否</td><td></td><td>附件文件 ID 列表</td></tr>
+<tr><td><code>is_customer_visible</code></td><td>tinyint(1)</td><td>是</td><td>INDEX</td><td>是否客户可见</td></tr>
+<tr><td><code>status</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td><code>pending</code>，<code>partial</code>，<code>delivered</code>，<code>need_supplement</code></td></tr>
+<tr><td><code>delivered_by</code></td><td>bigint unsigned</td><td>否</td><td></td><td>交付人</td></tr>
+<tr><td><code>delivered_at</code></td><td>datetime</td><td>否</td><td></td><td>交付时间</td></tr>
+<tr><td><code>customer_confirmed_at</code></td><td>datetime</td><td>否</td><td></td><td>客户确认时间</td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td>INDEX</td><td>创建时间</td></tr>
+<tr><td><code>updated_at</code></td><td>datetime</td><td>是</td><td></td><td>更新时间</td></tr>
+</table>
+<h3>4.20 售后工单表 <code>after_sale_tickets</code></h3>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>索引</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>PK</td><td>售后 ID</td></tr>
+<tr><td><code>ticket_no</code></td><td>varchar(32)</td><td>是</td><td>UNIQUE</td><td>售后单号</td></tr>
+<tr><td><code>order_id</code></td><td>bigint unsigned</td><td>是</td><td>INDEX</td><td>订单 ID</td></tr>
+<tr><td><code>customer_id</code></td><td>bigint unsigned</td><td>是</td><td>INDEX</td><td>客户 ID</td></tr>
+<tr><td><code>delivery_id</code></td><td>bigint unsigned</td><td>否</td><td>INDEX</td><td>关联交付</td></tr>
+<tr><td><code>type</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td><code>download_failed</code>，<code>source_run_issue</code>，<code>deploy_issue</code>，<code>function_question</code>，<code>service_unfinished</code>，<code>other</code></td></tr>
+<tr><td><code>title</code></td><td>varchar(128)</td><td>是</td><td></td><td>问题标题</td></tr>
+<tr><td><code>description</code></td><td>text</td><td>是</td><td></td><td>问题描述</td></tr>
+<tr><td><code>environment</code></td><td>varchar(500)</td><td>否</td><td></td><td>环境信息</td></tr>
+<tr><td><code>attachments</code></td><td>json</td><td>否</td><td></td><td>截图附件</td></tr>
+<tr><td><code>status</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td><code>pending</code>，<code>processing</code>，<code>waiting_customer</code>，<code>resolved</code>，<code>closed</code></td></tr>
+<tr><td><code>assignee_id</code></td><td>bigint unsigned</td><td>否</td><td>INDEX</td><td>处理人</td></tr>
+<tr><td><code>result</code></td><td>text</td><td>否</td><td></td><td>处理结果</td></tr>
+<tr><td><code>closed_at</code></td><td>datetime</td><td>否</td><td></td><td>关闭时间</td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td>INDEX</td><td>创建时间</td></tr>
+<tr><td><code>updated_at</code></td><td>datetime</td><td>是</td><td></td><td>更新时间</td></tr>
+</table>
+<h3>4.21 售后处理记录表 <code>after_sale_messages</code></h3>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>记录 ID</td></tr>
+<tr><td><code>ticket_id</code></td><td>bigint unsigned</td><td>是</td><td>售后 ID</td></tr>
+<tr><td><code>sender_type</code></td><td>varchar(32)</td><td>是</td><td><code>customer</code>，<code>admin</code></td></tr>
+<tr><td><code>sender_id</code></td><td>bigint unsigned</td><td>是</td><td>发送人 ID</td></tr>
+<tr><td><code>content</code></td><td>text</td><td>是</td><td>内容</td></tr>
+<tr><td><code>attachments</code></td><td>json</td><td>否</td><td>附件</td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td>创建时间</td></tr>
+</table>
+<h3>4.22 收藏与浏览表</h3>
+<h4>收藏表 <code>favorites</code></h4>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>索引</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>PK</td><td>收藏 ID</td></tr>
+<tr><td><code>customer_id</code></td><td>bigint unsigned</td><td>是</td><td>INDEX</td><td>客户 ID</td></tr>
+<tr><td><code>target_type</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td><code>product</code>，<code>service</code>，<code>bundle</code></td></tr>
+<tr><td><code>target_id</code></td><td>bigint unsigned</td><td>是</td><td>INDEX</td><td>目标 ID</td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td>INDEX</td><td>创建时间</td></tr>
+</table>
+<h4>浏览记录表 <code>browse_histories</code></h4>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>索引</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>PK</td><td>浏览 ID</td></tr>
+<tr><td><code>customer_id</code></td><td>bigint unsigned</td><td>否</td><td>INDEX</td><td>客户 ID，未登录可为空</td></tr>
+<tr><td><code>visitor_id</code></td><td>varchar(64)</td><td>否</td><td>INDEX</td><td>匿名访客标识</td></tr>
+<tr><td><code>target_type</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td><code>product</code>，<code>service</code>，<code>article</code></td></tr>
+<tr><td><code>target_id</code></td><td>bigint unsigned</td><td>是</td><td>INDEX</td><td>目标 ID</td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td>INDEX</td><td>浏览时间</td></tr>
+</table>
+<h3>4.23 文件资源表 <code>files</code></h3>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>索引</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>PK</td><td>文件 ID</td></tr>
+<tr><td><code>biz_type</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td><code>product</code>，<code>inquiry</code>，<code>payment</code>，<code>delivery</code>，<code>after_sale</code>，<code>content</code></td></tr>
+<tr><td><code>biz_id</code></td><td>bigint unsigned</td><td>否</td><td>INDEX</td><td>业务 ID</td></tr>
+<tr><td><code>original_name</code></td><td>varchar(255)</td><td>是</td><td></td><td>原文件名</td></tr>
+<tr><td><code>file_name</code></td><td>varchar(255)</td><td>是</td><td></td><td>存储文件名</td></tr>
+<tr><td><code>file_ext</code></td><td>varchar(20)</td><td>否</td><td></td><td>后缀</td></tr>
+<tr><td><code>mime_type</code></td><td>varchar(100)</td><td>否</td><td></td><td>MIME 类型</td></tr>
+<tr><td><code>size_bytes</code></td><td>bigint unsigned</td><td>是</td><td></td><td>文件大小</td></tr>
+<tr><td><code>storage_key</code></td><td>varchar(500)</td><td>是</td><td></td><td>对象存储 Key</td></tr>
+<tr><td><code>url</code></td><td>varchar(500)</td><td>否</td><td></td><td>公开访问地址或临时地址</td></tr>
+<tr><td><code>visibility</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td><code>public</code>，<code>private</code></td></tr>
+<tr><td><code>checksum</code></td><td>varchar(128)</td><td>否</td><td></td><td>文件校验值</td></tr>
+<tr><td><code>uploaded_by_type</code></td><td>varchar(32)</td><td>是</td><td></td><td><code>customer</code>，<code>admin</code></td></tr>
+<tr><td><code>uploaded_by</code></td><td>bigint unsigned</td><td>是</td><td></td><td>上传人</td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td>INDEX</td><td>创建时间</td></tr>
+<tr><td><code>deleted_at</code></td><td>datetime</td><td>否</td><td></td><td>删除时间</td></tr>
+</table>
+<h3>4.24 内容运营表</h3>
+<h4>Banner 表 <code>banners</code></h4>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>Banner ID</td></tr>
+<tr><td><code>title</code></td><td>varchar(100)</td><td>是</td><td>标题</td></tr>
+<tr><td><code>image_url</code></td><td>varchar(500)</td><td>是</td><td>图片</td></tr>
+<tr><td><code>link_type</code></td><td>varchar(32)</td><td>是</td><td><code>product</code>，<code>service</code>，<code>article</code>，<code>url</code>，<code>none</code></td></tr>
+<tr><td><code>link_value</code></td><td>varchar(255)</td><td>否</td><td>跳转值</td></tr>
+<tr><td><code>position</code></td><td>varchar(32)</td><td>是</td><td>展示位置，如 <code>home</code></td></tr>
+<tr><td><code>sort_no</code></td><td>int</td><td>是</td><td>排序</td></tr>
+<tr><td><code>status</code></td><td>varchar(32)</td><td>是</td><td><code>enabled</code>，<code>disabled</code></td></tr>
+<tr><td><code>start_at</code></td><td>datetime</td><td>否</td><td>开始时间</td></tr>
+<tr><td><code>end_at</code></td><td>datetime</td><td>否</td><td>结束时间</td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td>创建时间</td></tr>
+<tr><td><code>updated_at</code></td><td>datetime</td><td>是</td><td>更新时间</td></tr>
+</table>
+<h4>文章表 <code>articles</code></h4>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>文章 ID</td></tr>
+<tr><td><code>category_id</code></td><td>bigint unsigned</td><td>否</td><td>分类 ID</td></tr>
+<tr><td><code>type</code></td><td>varchar(32)</td><td>是</td><td><code>help</code>，<code>notice</code>，<code>tutorial</code>，<code>agreement</code></td></tr>
+<tr><td><code>title</code></td><td>varchar(128)</td><td>是</td><td>标题</td></tr>
+<tr><td><code>summary</code></td><td>varchar(255)</td><td>否</td><td>摘要</td></tr>
+<tr><td><code>content</code></td><td>longtext</td><td>是</td><td>内容</td></tr>
+<tr><td><code>cover_url</code></td><td>varchar(500)</td><td>否</td><td>封面</td></tr>
+<tr><td><code>status</code></td><td>varchar(32)</td><td>是</td><td><code>draft</code>，<code>published</code>，<code>hidden</code></td></tr>
+<tr><td><code>sort_no</code></td><td>int</td><td>是</td><td>排序</td></tr>
+<tr><td><code>published_at</code></td><td>datetime</td><td>否</td><td>发布时间</td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td>创建时间</td></tr>
+<tr><td><code>updated_at</code></td><td>datetime</td><td>是</td><td>更新时间</td></tr>
+</table>
+<h3>4.25 消息表 <code>messages</code></h3>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>索引</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>PK</td><td>消息 ID</td></tr>
+<tr><td><code>receiver_type</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td><code>customer</code>，<code>admin</code></td></tr>
+<tr><td><code>receiver_id</code></td><td>bigint unsigned</td><td>是</td><td>INDEX</td><td>接收人</td></tr>
+<tr><td><code>type</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td><code>inquiry</code>，<code>order</code>，<code>payment</code>，<code>delivery</code>，<code>after_sale</code>，<code>system</code></td></tr>
+<tr><td><code>title</code></td><td>varchar(128)</td><td>是</td><td></td><td>标题</td></tr>
+<tr><td><code>content</code></td><td>varchar(1000)</td><td>是</td><td></td><td>内容</td></tr>
+<tr><td><code>link_type</code></td><td>varchar(32)</td><td>否</td><td></td><td>跳转类型</td></tr>
+<tr><td><code>link_id</code></td><td>bigint unsigned</td><td>否</td><td></td><td>跳转 ID</td></tr>
+<tr><td><code>is_read</code></td><td>tinyint(1)</td><td>是</td><td>INDEX</td><td>是否已读</td></tr>
+<tr><td><code>read_at</code></td><td>datetime</td><td>否</td><td></td><td>阅读时间</td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td>INDEX</td><td>创建时间</td></tr>
+</table>
+<h3>4.26 操作日志表 <code>operation_logs</code></h3>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>索引</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>PK</td><td>日志 ID</td></tr>
+<tr><td><code>operator_type</code></td><td>varchar(32)</td><td>是</td><td>INDEX</td><td><code>customer</code>，<code>admin</code>，<code>system</code></td></tr>
+<tr><td><code>operator_id</code></td><td>bigint unsigned</td><td>否</td><td>INDEX</td><td>操作人</td></tr>
+<tr><td><code>module</code></td><td>varchar(64)</td><td>是</td><td>INDEX</td><td>模块</td></tr>
+<tr><td><code>action</code></td><td>varchar(64)</td><td>是</td><td>INDEX</td><td>动作</td></tr>
+<tr><td><code>biz_type</code></td><td>varchar(64)</td><td>否</td><td>INDEX</td><td>业务类型</td></tr>
+<tr><td><code>biz_id</code></td><td>bigint unsigned</td><td>否</td><td>INDEX</td><td>业务 ID</td></tr>
+<tr><td><code>before_data</code></td><td>json</td><td>否</td><td></td><td>变更前</td></tr>
+<tr><td><code>after_data</code></td><td>json</td><td>否</td><td></td><td>变更后</td></tr>
+<tr><td><code>ip</code></td><td>varchar(64)</td><td>否</td><td></td><td>IP</td></tr>
+<tr><td><code>user_agent</code></td><td>varchar(500)</td><td>否</td><td></td><td>UA</td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td>INDEX</td><td>创建时间</td></tr>
+</table>
+<h3>4.27 系统配置表 <code>system_configs</code></h3>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>索引</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>PK</td><td>配置 ID</td></tr>
+<tr><td><code>config_key</code></td><td>varchar(100)</td><td>是</td><td>UNIQUE</td><td>配置键</td></tr>
+<tr><td><code>config_value</code></td><td>text</td><td>否</td><td></td><td>配置值</td></tr>
+<tr><td><code>value_type</code></td><td>varchar(32)</td><td>是</td><td></td><td><code>string</code>，<code>number</code>，<code>boolean</code>，<code>json</code></td></tr>
+<tr><td><code>description</code></td><td>varchar(255)</td><td>否</td><td></td><td>描述</td></tr>
+<tr><td><code>is_public</code></td><td>tinyint(1)</td><td>是</td><td>INDEX</td><td>是否客户端可读取</td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td></td><td>创建时间</td></tr>
+<tr><td><code>updated_at</code></td><td>datetime</td><td>是</td><td></td><td>更新时间</td></tr>
+</table>
+<h3>4.28 埋点事件表 <code>analytics_events</code></h3>
+<table>
+<tr><td>字段</td><td>类型</td><td>必填</td><td>索引</td><td>说明</td></tr>
+<tr><td><code>id</code></td><td>bigint unsigned</td><td>是</td><td>PK</td><td>事件 ID</td></tr>
+<tr><td><code>event_name</code></td><td>varchar(100)</td><td>是</td><td>INDEX</td><td>事件名</td></tr>
+<tr><td><code>customer_id</code></td><td>bigint unsigned</td><td>否</td><td>INDEX</td><td>客户 ID</td></tr>
+<tr><td><code>visitor_id</code></td><td>varchar(64)</td><td>否</td><td>INDEX</td><td>访客 ID</td></tr>
+<tr><td><code>target_type</code></td><td>varchar(32)</td><td>否</td><td>INDEX</td><td>目标类型</td></tr>
+<tr><td><code>target_id</code></td><td>bigint unsigned</td><td>否</td><td>INDEX</td><td>目标 ID</td></tr>
+<tr><td><code>properties</code></td><td>json</td><td>否</td><td></td><td>扩展属性</td></tr>
+<tr><td><code>source</code></td><td>varchar(64)</td><td>否</td><td>INDEX</td><td>来源</td></tr>
+<tr><td><code>created_at</code></td><td>datetime</td><td>是</td><td>INDEX</td><td>事件时间</td></tr>
+</table>
+<h2>5. 接口规范</h2>
+<h3>5.1 通用约定</h3>
+<h4>请求约定</h4>
+<table>
+<tr><td>项目</td><td>说明</td></tr>
+<tr><td>Base URL</td><td><code>/api/v1</code></td></tr>
+<tr><td>Content-Type</td><td><code>application/json; charset=utf-8</code></td></tr>
+<tr><td>文件上传</td><td><code>multipart/form-data</code></td></tr>
+<tr><td>客户端鉴权</td><td><code>Authorization: Bearer &lt;customer_token&gt;</code></td></tr>
+<tr><td>后台鉴权</td><td><code>Authorization: Bearer &lt;admin_token&gt;</code></td></tr>
+<tr><td>时间格式</td><td><code>YYYY-MM-DD HH:mm:ss</code></td></tr>
+<tr><td>分页参数</td><td><code>page</code> 默认 1，<code>pageSize</code> 默认 20，最大 100</td></tr>
+</table>
+<h4>通用响应</h4>
+<pre><code>
+{
+  "code": 0,
+  "message": "success",
+  "data": {},
+  "traceId": "202605211600001234"
+}
+</code></pre>
+<h4>分页响应</h4>
+<pre><code>
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "list": [],
+    "page": 1,
+    "pageSize": 20,
+    "total": 100
+  }
+}
+</code></pre>
+<h4>常用错误码</h4>
+<table>
+<tr><td>错误码</td><td>说明</td></tr>
+<tr><td><code>0</code></td><td>成功</td></tr>
+<tr><td><code>400001</code></td><td>参数错误</td></tr>
+<tr><td><code>401001</code></td><td>未登录或 Token 无效</td></tr>
+<tr><td><code>403001</code></td><td>无权限</td></tr>
+<tr><td><code>404001</code></td><td>数据不存在</td></tr>
+<tr><td><code>409001</code></td><td>状态冲突，不允许当前操作</td></tr>
+<tr><td><code>429001</code></td><td>请求过于频繁</td></tr>
+<tr><td><code>500001</code></td><td>服务端异常</td></tr>
+</table>
+<h3>5.2 客户端接口</h3>
+<h4>5.2.1 微信登录</h4>
+<table>
+<tr><td>项目</td><td>内容</td></tr>
+<tr><td>Method</td><td><code>POST</code></td></tr>
+<tr><td>Path</td><td><code>/mini/auth/wechat-login</code></td></tr>
+<tr><td>Auth</td><td>否</td></tr>
+</table>
+<p>请求体：</p>
+<pre><code>
+{
+  "code": "wx_login_code",
+  "encryptedData": "optional",
+  "iv": "optional"
+}
+</code></pre>
+<p>响应：</p>
+<pre><code>
+{
+  "token": "customer_token",
+  "customer": {
+    "id": 1,
+    "nickname": "客户",
+    "avatarUrl": "",
+    "mobile": ""
+  }
+}
+</code></pre>
+<h4>5.2.2 获取个人资料</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>Auth</td></tr>
+<tr><td><code>GET</code></td><td><code>/mini/profile</code></td><td>客户</td></tr>
+</table>
+<p>响应字段：<code>id</code>、<code>nickname</code>、<code>avatarUrl</code>、<code>mobile</code>、<code>companyName</code>、<code>contactName</code>、<code>contactWechat</code>、<code>contactAddress</code>。</p>
+<h4>5.2.3 更新个人资料</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>Auth</td></tr>
+<tr><td><code>PUT</code></td><td><code>/mini/profile</code></td><td>客户</td></tr>
+</table>
+<p>请求体：</p>
+<pre><code>
+{
+  "nickname": "客户",
+  "avatarUrl": "https://example.com/avatar.png",
+  "companyName": "某公司",
+  "contactName": "张三",
+  "contactWechat": "wechat_id",
+  "contactAddress": "联系地址"
+}
+</code></pre>
+<h4>5.2.4 首页数据</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>Auth</td></tr>
+<tr><td><code>GET</code></td><td><code>/mini/home</code></td><td>可选</td></tr>
+</table>
+<p>响应字段：<code>banners</code>、<code>categories</code>、<code>recommendedProducts</code>、<code>hotServices</code>、<code>latestProducts</code>、<code>bundles</code>、<code>articles</code>。</p>
+<h4>5.2.5 分类列表</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>Auth</td></tr>
+<tr><td><code>GET</code></td><td><code>/mini/categories</code></td><td>否</td></tr>
+</table>
+<p>查询参数：</p>
+<table>
+<tr><td>参数</td><td>必填</td><td>说明</td></tr>
+<tr><td><code>type</code></td><td>否</td><td><code>product</code>，<code>service</code>，<code>article</code></td></tr>
+</table>
+<h4>5.2.6 标签列表</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>Auth</td></tr>
+<tr><td><code>GET</code></td><td><code>/mini/tags</code></td><td>否</td></tr>
+</table>
+<p>查询参数：<code>type</code>、<code>isHot</code>。</p>
+<h4>5.2.7 商品列表</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>Auth</td></tr>
+<tr><td><code>GET</code></td><td><code>/mini/products</code></td><td>否</td></tr>
+</table>
+<p>查询参数：</p>
+<table>
+<tr><td>参数</td><td>说明</td></tr>
+<tr><td><code>keyword</code></td><td>搜索关键词</td></tr>
+<tr><td><code>categoryId</code></td><td>分类 ID</td></tr>
+<tr><td><code>tagIds</code></td><td>标签 ID，英文逗号分隔</td></tr>
+<tr><td><code>priceMin</code> / <code>priceMax</code></td><td>价格区间</td></tr>
+<tr><td><code>hasDemo</code></td><td>是否有演示</td></tr>
+<tr><td><code>isDeployIncluded</code></td><td>是否含部署</td></tr>
+<tr><td><code>isCustomizable</code></td><td>是否支持二开</td></tr>
+<tr><td><code>sort</code></td><td><code>recommend</code>，<code>latest</code>，<code>price_asc</code>，<code>price_desc</code>，<code>views</code>，<code>deals</code></td></tr>
+<tr><td><code>page</code> / <code>pageSize</code></td><td>分页</td></tr>
+</table>
+<p>列表项字段：<code>id</code>、<code>title</code>、<code>subtitle</code>、<code>coverUrl</code>、<code>price</code>、<code>startPrice</code>、<code>priceText</code>、<code>techStack</code>、<code>badges</code>、<code>viewCount</code>、<code>dealCount</code>、<code>isFavorite</code>。</p>
+<h4>5.2.8 商品详情</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>Auth</td></tr>
+<tr><td><code>GET</code></td><td><code>/mini/products/{id}</code></td><td>可选</td></tr>
+</table>
+<p>响应字段：基础信息、分类、标签、轮播图、截图、功能清单、演示信息、部署要求、交付内容、购买须知、FAQ、关联服务、关联套餐、收藏状态。</p>
+<h4>5.2.9 服务列表</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>Auth</td></tr>
+<tr><td><code>GET</code></td><td><code>/mini/services</code></td><td>否</td></tr>
+</table>
+<p>查询参数：<code>keyword</code>、<code>categoryId</code>、<code>tagIds</code>、<code>priceMin</code>、<code>priceMax</code>、<code>sort</code>、<code>page</code>、<code>pageSize</code>。</p>
+<h4>5.2.10 服务详情</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>Auth</td></tr>
+<tr><td><code>GET</code></td><td><code>/mini/services/{id}</code></td><td>可选</td></tr>
+</table>
+<p>响应字段：服务名称、封面、起步价、周期、服务范围、流程、所需资料、交付标准、不包含内容、售后说明、套餐、收藏状态。</p>
+<h4>5.2.11 收藏/取消收藏</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>Auth</td></tr>
+<tr><td><code>POST</code></td><td><code>/mini/favorites</code></td><td>客户</td></tr>
+<tr><td><code>DELETE</code></td><td><code>/mini/favorites</code></td><td>客户</td></tr>
+</table>
+<p>请求体：</p>
+<pre><code>
+{
+  "targetType": "product",
+  "targetId": 1
+}
+</code></pre>
+<h4>5.2.12 收藏列表</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>Auth</td></tr>
+<tr><td><code>GET</code></td><td><code>/mini/favorites</code></td><td>客户</td></tr>
+</table>
+<p>查询参数：<code>targetType</code>、<code>page</code>、<code>pageSize</code>。</p>
+<h4>5.2.13 创建购买意向/服务预约/定制需求</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>Auth</td></tr>
+<tr><td><code>POST</code></td><td><code>/mini/inquiries</code></td><td>客户</td></tr>
+</table>
+<p>请求体：</p>
+<pre><code>
+{
+  "sourceType": "product",
+  "sourceId": 1,
+  "title": "购买某商城源码",
+  "demandType": "source_purchase",
+  "description": "需要部署和简单讲解",
+  "contactName": "张三",
+  "contactMobile": "13800000000",
+  "contactWechat": "wechat_id",
+  "budgetMin": 1000,
+  "budgetMax": 3000,
+  "expectedFinishAt": "2026-05-30 18:00:00",
+  "attachmentFileIds": [10, 11],
+  "options": {
+    "needDeploy": true,
+    "needCustomization": false
+  }
+}
+</code></pre>
+<p>响应：<code>inquiryId</code>、<code>inquiryNo</code>、<code>status</code>。</p>
+<h4>5.2.14 我的询单列表</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>Auth</td></tr>
+<tr><td><code>GET</code></td><td><code>/mini/inquiries</code></td><td>客户</td></tr>
+</table>
+<p>查询参数：<code>status</code>、<code>page</code>、<code>pageSize</code>。</p>
+<h4>5.2.15 订单列表</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>Auth</td></tr>
+<tr><td><code>GET</code></td><td><code>/mini/orders</code></td><td>客户</td></tr>
+</table>
+<p>查询参数：<code>status</code>、<code>page</code>、<code>pageSize</code>。</p>
+<h4>5.2.16 订单详情</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>Auth</td></tr>
+<tr><td><code>GET</code></td><td><code>/mini/orders/{id}</code></td><td>客户</td></tr>
+</table>
+<p>响应字段：订单基础信息、明细、金额、付款状态、付款说明、凭证记录、交付记录、售后入口、客户可见备注。</p>
+<h4>5.2.17 上传付款凭证</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>Auth</td></tr>
+<tr><td><code>POST</code></td><td><code>/mini/orders/{id}/payment-vouchers</code></td><td>客户</td></tr>
+</table>
+<p>请求体：</p>
+<pre><code>
+{
+  "amount": 1999.00,
+  "paymentMethod": "wechat_transfer",
+  "paidAt": "2026-05-21 16:30:00",
+  "voucherFileId": 100,
+  "transactionNo": "optional",
+  "remark": "已转账"
+}
+</code></pre>
+<p>响应：<code>paymentRecordId</code>、<code>status</code>。</p>
+<h4>5.2.18 交付记录列表</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>Auth</td></tr>
+<tr><td><code>GET</code></td><td><code>/mini/orders/{id}/deliveries</code></td><td>客户</td></tr>
+</table>
+<p>权限：只能查看本人订单，且仅返回 <code>isCustomerVisible = true</code> 的交付记录。</p>
+<h4>5.2.19 确认交付</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>Auth</td></tr>
+<tr><td><code>POST</code></td><td><code>/mini/deliveries/{id}/confirm</code></td><td>客户</td></tr>
+</table>
+<p>响应：<code>deliveryStatus</code>、<code>orderStatus</code>。</p>
+<h4>5.2.20 创建售后工单</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>Auth</td></tr>
+<tr><td><code>POST</code></td><td><code>/mini/after-sales</code></td><td>客户</td></tr>
+</table>
+<p>请求体：</p>
+<pre><code>
+{
+  "orderId": 1,
+  "deliveryId": 2,
+  "type": "source_run_issue",
+  "title": "源码运行报错",
+  "description": "本地启动后接口报错",
+  "environment": "Node.js 20, MySQL 8",
+  "attachmentFileIds": [101, 102]
+}
+</code></pre>
+<h4>5.2.21 售后详情与回复</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>Auth</td><td>说明</td></tr>
+<tr><td><code>GET</code></td><td><code>/mini/after-sales/{id}</code></td><td>客户</td><td>查看售后详情</td></tr>
+<tr><td><code>POST</code></td><td><code>/mini/after-sales/{id}/messages</code></td><td>客户</td><td>追加回复</td></tr>
+</table>
+<h4>5.2.22 文件上传</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>Auth</td></tr>
+<tr><td><code>POST</code></td><td><code>/mini/files</code></td><td>客户</td></tr>
+</table>
+<p>表单字段：<code>file</code>、<code>bizType</code>。  </p>
+<p>返回：<code>fileId</code>、<code>url</code>、<code>originalName</code>、<code>sizeBytes</code>。</p>
+<h4>5.2.23 消息列表与已读</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>Auth</td><td>说明</td></tr>
+<tr><td><code>GET</code></td><td><code>/mini/messages</code></td><td>客户</td><td>消息列表</td></tr>
+<tr><td><code>POST</code></td><td><code>/mini/messages/{id}/read</code></td><td>客户</td><td>标记已读</td></tr>
+</table>
+<h3>5.3 管理后台接口</h3>
+<h4>5.3.1 后台登录</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>Auth</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/auth/login</code></td><td>否</td></tr>
+</table>
+<p>请求体：</p>
+<pre><code>
+{
+  "username": "admin",
+  "password": "password"
+}
+</code></pre>
+<p>响应：<code>token</code>、<code>user</code>、<code>roles</code>、<code>permissions</code>、<code>menus</code>。</p>
+<h4>5.3.2 后台首页统计</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>Auth</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/dashboard/overview</code></td><td>后台</td></tr>
+</table>
+<p>查询参数：<code>startDate</code>、<code>endDate</code>。  </p>
+<p>响应字段：今日新增客户、今日询单、待跟进、待确认收款、待交付、售后待处理、订单金额、确认收款金额、成交订单数、转化率。</p>
+<h4>5.3.3 分类管理</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>权限</td><td>说明</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/categories</code></td><td><code>category:view</code></td><td>列表</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/categories</code></td><td><code>category:create</code></td><td>新增</td></tr>
+<tr><td><code>PUT</code></td><td><code>/admin/categories/{id}</code></td><td><code>category:update</code></td><td>编辑</td></tr>
+<tr><td><code>DELETE</code></td><td><code>/admin/categories/{id}</code></td><td><code>category:delete</code></td><td>删除</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/categories/{id}/enable</code></td><td><code>category:update</code></td><td>启用</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/categories/{id}/disable</code></td><td><code>category:update</code></td><td>禁用</td></tr>
+</table>
+<h4>5.3.4 标签管理</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>权限</td><td>说明</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/tags</code></td><td><code>tag:view</code></td><td>列表</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/tags</code></td><td><code>tag:create</code></td><td>新增</td></tr>
+<tr><td><code>PUT</code></td><td><code>/admin/tags/{id}</code></td><td><code>tag:update</code></td><td>编辑</td></tr>
+<tr><td><code>DELETE</code></td><td><code>/admin/tags/{id}</code></td><td><code>tag:delete</code></td><td>删除</td></tr>
+</table>
+<h4>5.3.5 商品管理</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>权限</td><td>说明</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/products</code></td><td><code>product:view</code></td><td>商品列表</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/products</code></td><td><code>product:create</code></td><td>新增商品</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/products/{id}</code></td><td><code>product:view</code></td><td>商品详情</td></tr>
+<tr><td><code>PUT</code></td><td><code>/admin/products/{id}</code></td><td><code>product:update</code></td><td>编辑商品</td></tr>
+<tr><td><code>DELETE</code></td><td><code>/admin/products/{id}</code></td><td><code>product:delete</code></td><td>删除商品</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/products/{id}/publish</code></td><td><code>product:publish</code></td><td>上架</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/products/{id}/unpublish</code></td><td><code>product:publish</code></td><td>下架</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/products/{id}/copy</code></td><td><code>product:create</code></td><td>复制商品</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/products/batch-status</code></td><td><code>product:publish</code></td><td>批量上下架</td></tr>
+</table>
+<p>商品保存请求体核心字段：</p>
+<pre><code>
+{
+  "categoryId": 1,
+  "title": "商城系统源码",
+  "subtitle": "含小程序和后台",
+  "coverUrl": "https://example.com/cover.png",
+  "price": 1999.00,
+  "originPrice": 2999.00,
+  "startPrice": 1999.00,
+  "priceText": "源码起售",
+  "tagIds": [1, 2],
+  "techStack": "Vue, Java, MySQL",
+  "demoUrl": "https://demo.example.com",
+  "demoAccount": "admin / 123456",
+  "featureIntro": "功能介绍",
+  "featureList": ["商品管理", "订单管理"],
+  "deliveryContent": "源码包、数据库脚本、部署文档",
+  "purchaseNotice": "源码商品售出后按规则处理",
+  "status": "draft",
+  "isNew": true,
+  "isHot": false,
+  "isRecommended": true
+}
+</code></pre>
+<h4>5.3.6 服务管理</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>权限</td><td>说明</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/services</code></td><td><code>service:view</code></td><td>服务列表</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/services</code></td><td><code>service:create</code></td><td>新增服务</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/services/{id}</code></td><td><code>service:view</code></td><td>服务详情</td></tr>
+<tr><td><code>PUT</code></td><td><code>/admin/services/{id}</code></td><td><code>service:update</code></td><td>编辑服务</td></tr>
+<tr><td><code>DELETE</code></td><td><code>/admin/services/{id}</code></td><td><code>service:delete</code></td><td>删除服务</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/services/{id}/publish</code></td><td><code>service:publish</code></td><td>上架</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/services/{id}/unpublish</code></td><td><code>service:publish</code></td><td>下架</td></tr>
+</table>
+<h4>5.3.7 套餐管理</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>权限</td><td>说明</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/bundles</code></td><td><code>bundle:view</code></td><td>列表</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/bundles</code></td><td><code>bundle:create</code></td><td>新增</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/bundles/{id}</code></td><td><code>bundle:view</code></td><td>详情</td></tr>
+<tr><td><code>PUT</code></td><td><code>/admin/bundles/{id}</code></td><td><code>bundle:update</code></td><td>编辑</td></tr>
+<tr><td><code>DELETE</code></td><td><code>/admin/bundles/{id}</code></td><td><code>bundle:delete</code></td><td>删除</td></tr>
+</table>
+<h4>5.3.8 客户管理</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>权限</td><td>说明</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/customers</code></td><td><code>customer:view</code></td><td>客户列表</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/customers/{id}</code></td><td><code>customer:view</code></td><td>客户详情</td></tr>
+<tr><td><code>PUT</code></td><td><code>/admin/customers/{id}/remark</code></td><td><code>customer:update</code></td><td>更新备注</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/customers/{id}/tags</code></td><td><code>customer:update</code></td><td>设置标签</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/customers/export</code></td><td><code>customer:export</code></td><td>导出客户</td></tr>
+</table>
+<p>客户详情应包含基础资料、询单、订单、收款、交付、售后、收藏、浏览、跟进备注。</p>
+<h4>5.3.9 询单管理</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>权限</td><td>说明</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/inquiries</code></td><td><code>inquiry:view</code></td><td>询单列表</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/inquiries/{id}</code></td><td><code>inquiry:view</code></td><td>询单详情</td></tr>
+<tr><td><code>PUT</code></td><td><code>/admin/inquiries/{id}</code></td><td><code>inquiry:update</code></td><td>编辑询单</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/inquiries/{id}/assign</code></td><td><code>inquiry:assign</code></td><td>分配跟进人</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/inquiries/{id}/follow-logs</code></td><td><code>inquiry:follow</code></td><td>添加跟进</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/inquiries/{id}/quote</code></td><td><code>inquiry:quote</code></td><td>报价</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/inquiries/{id}/convert-order</code></td><td><code>order:create</code></td><td>转订单</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/inquiries/{id}/close</code></td><td><code>inquiry:update</code></td><td>关闭询单</td></tr>
+</table>
+<p>转订单请求体：</p>
+<pre><code>
+{
+  "title": "商城系统源码购买",
+  "items": [
+    {
+      "itemType": "product",
+      "itemId": 1,
+      "itemName": "商城系统源码",
+      "unitPrice": 1999,
+      "quantity": 1
+    }
+  ],
+  "discountAmount": 0,
+  "extraAmount": 0,
+  "paymentInstruction": "请按沟通方式付款后上传凭证",
+  "customerRemark": "含一次远程部署",
+  "internalRemark": "客户来自社群"
+}
+</code></pre>
+<h4>5.3.10 订单管理</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>权限</td><td>说明</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/orders</code></td><td><code>order:view</code></td><td>订单列表</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/orders</code></td><td><code>order:create</code></td><td>手工创建订单</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/orders/{id}</code></td><td><code>order:view</code></td><td>订单详情</td></tr>
+<tr><td><code>PUT</code></td><td><code>/admin/orders/{id}</code></td><td><code>order:update</code></td><td>编辑订单基础信息</td></tr>
+<tr><td><code>PUT</code></td><td><code>/admin/orders/{id}/amount</code></td><td><code>order:update_amount</code></td><td>修改金额</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/orders/{id}/confirm</code></td><td><code>order:confirm</code></td><td>确认订单</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/orders/{id}/cancel</code></td><td><code>order:cancel</code></td><td>取消订单</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/orders/{id}/complete</code></td><td><code>order:complete</code></td><td>完成订单</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/orders/export</code></td><td><code>order:export</code></td><td>导出订单</td></tr>
+</table>
+<h4>5.3.11 收款记录管理</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>权限</td><td>说明</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/payment-records</code></td><td><code>payment:view</code></td><td>收款列表</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/orders/{id}/payment-records</code></td><td><code>payment:create</code></td><td>后台新增收款</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/payment-records/{id}</code></td><td><code>payment:view</code></td><td>收款详情</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/payment-records/{id}/confirm</code></td><td><code>payment:confirm</code></td><td>确认到账</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/payment-records/{id}/reject</code></td><td><code>payment:confirm</code></td><td>驳回凭证</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/payment-records/{id}/void</code></td><td><code>payment:void</code></td><td>作废收款</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/payment-records/export</code></td><td><code>payment:export</code></td><td>导出收款</td></tr>
+</table>
+<p>确认收款请求体：</p>
+<pre><code>
+{
+  "confirmedAmount": 1999.00,
+  "receiverAccount": "微信/支付宝/银行卡尾号",
+  "transactionNo": "optional",
+  "remark": "已核实到账"
+}
+</code></pre>
+<h4>5.3.12 交付管理</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>权限</td><td>说明</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/deliveries</code></td><td><code>delivery:view</code></td><td>交付列表</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/orders/{id}/deliveries</code></td><td><code>delivery:create</code></td><td>添加交付</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/deliveries/{id}</code></td><td><code>delivery:view</code></td><td>交付详情</td></tr>
+<tr><td><code>PUT</code></td><td><code>/admin/deliveries/{id}</code></td><td><code>delivery:update</code></td><td>编辑交付</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/deliveries/{id}/notify</code></td><td><code>delivery:notify</code></td><td>通知客户</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/deliveries/{id}/complete</code></td><td><code>delivery:update</code></td><td>标记已交付</td></tr>
+</table>
+<p>添加交付请求体：</p>
+<pre><code>
+{
+  "type": "netdisk",
+  "title": "源码网盘交付",
+  "content": "网盘链接、提取码、部署说明",
+  "attachmentFileIds": [200],
+  "isCustomerVisible": true,
+  "status": "delivered"
+}
+</code></pre>
+<h4>5.3.13 售后管理</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>权限</td><td>说明</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/after-sales</code></td><td><code>after_sale:view</code></td><td>售后列表</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/after-sales/{id}</code></td><td><code>after_sale:view</code></td><td>售后详情</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/after-sales/{id}/assign</code></td><td><code>after_sale:assign</code></td><td>分配处理人</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/after-sales/{id}/messages</code></td><td><code>after_sale:reply</code></td><td>回复</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/after-sales/{id}/resolve</code></td><td><code>after_sale:resolve</code></td><td>标记解决</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/after-sales/{id}/close</code></td><td><code>after_sale:close</code></td><td>关闭</td></tr>
+</table>
+<h4>5.3.14 文件管理</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>权限</td><td>说明</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/files</code></td><td><code>file:upload</code></td><td>上传文件</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/files</code></td><td><code>file:view</code></td><td>文件列表</td></tr>
+<tr><td><code>DELETE</code></td><td><code>/admin/files/{id}</code></td><td><code>file:delete</code></td><td>删除文件</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/files/{id}/download-url</code></td><td><code>file:view</code></td><td>获取私有文件临时下载链接</td></tr>
+</table>
+<h4>5.3.15 内容管理</h4>
+<table>
+<tr><td>模块</td><td>接口前缀</td><td>操作</td></tr>
+<tr><td>Banner</td><td><code>/admin/banners</code></td><td>列表、新增、详情、编辑、删除、启用、禁用</td></tr>
+<tr><td>文章</td><td><code>/admin/articles</code></td><td>列表、新增、详情、编辑、删除、发布、隐藏</td></tr>
+<tr><td>系统配置</td><td><code>/admin/system-configs</code></td><td>列表、详情、编辑</td></tr>
+</table>
+<h4>5.3.16 权限管理</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>权限</td><td>说明</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/users</code></td><td><code>admin_user:view</code></td><td>管理员列表</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/users</code></td><td><code>admin_user:create</code></td><td>新增管理员</td></tr>
+<tr><td><code>PUT</code></td><td><code>/admin/users/{id}</code></td><td><code>admin_user:update</code></td><td>编辑管理员</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/users/{id}/reset-password</code></td><td><code>admin_user:update</code></td><td>重置密码</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/roles</code></td><td><code>role:view</code></td><td>角色列表</td></tr>
+<tr><td><code>POST</code></td><td><code>/admin/roles</code></td><td><code>role:create</code></td><td>新增角色</td></tr>
+<tr><td><code>PUT</code></td><td><code>/admin/roles/{id}/permissions</code></td><td><code>role:permission</code></td><td>设置角色权限</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/permissions</code></td><td><code>permission:view</code></td><td>权限树</td></tr>
+</table>
+<h4>5.3.17 数据统计</h4>
+<table>
+<tr><td>Method</td><td>Path</td><td>权限</td><td>说明</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/statistics/products</code></td><td><code>statistics:view</code></td><td>商品浏览、收藏、咨询、成交</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/statistics/services</code></td><td><code>statistics:view</code></td><td>服务浏览、预约、成交</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/statistics/orders</code></td><td><code>statistics:view</code></td><td>订单金额、成交率、未收款</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/statistics/customers</code></td><td><code>statistics:view</code></td><td>客户新增、活跃、成交</td></tr>
+<tr><td><code>GET</code></td><td><code>/admin/statistics/search-keywords</code></td><td><code>statistics:view</code></td><td>热门搜索词</td></tr>
+</table>
+<h2>6. 权限与安全设计</h2>
+<h3>6.1 客户端数据权限</h3>
+<ol>
+<li>客户只能查看自己的询单、订单、付款凭证、交付资料和售后记录。</li>
+<li>商品、服务、分类、标签、公开文章允许未登录访问。</li>
+<li>收藏、订单、交付、售后、消息必须登录。</li>
+<li>私有文件下载前必须校验业务归属，例如订单客户 ID 是否匹配。</li>
+</ol>
+<h3>6.2 后台 RBAC 权限</h3>
+<table>
+<tr><td>角色</td><td>权限范围</td></tr>
+<tr><td>超级管理员</td><td>全部菜单与操作权限</td></tr>
+<tr><td>运营</td><td>商品、服务、套餐、内容、统计，不含敏感收款确认</td></tr>
+<tr><td>客服</td><td>客户、询单、订单跟进、售后回复，不可作废收款</td></tr>
+<tr><td>交付人员</td><td>订单查看、交付资料维护、售后协助</td></tr>
+<tr><td>只读人员</td><td>只读查看，不可编辑、删除、导出</td></tr>
+</table>
+<h3>6.3 敏感信息保护</h3>
+<ol>
+<li>手机号、微信号、付款凭证、交付账号等敏感信息后台按权限脱敏展示。</li>
+<li>交付内容中如包含账号密码，建议字段级加密保存。</li>
+<li>私有文件使用短期签名 URL，不直接暴露永久地址。</li>
+<li>重要操作写入操作日志，包括收款确认、收款作废、交付资料修改、订单金额修改。</li>
+<li>文件上传限制格式、大小，并接入安全扫描或内容审核能力。</li>
+</ol>
+<h3>6.4 接口安全</h3>
+<ol>
+<li>登录、上传、提交询单、上传凭证接口需要限流。</li>
+<li>后台登录连续失败应触发短时锁定或验证码。</li>
+<li>所有金额修改和状态流转均在服务端校验，不信任前端传入状态。</li>
+<li>所有列表查询需要分页，避免大查询。</li>
+<li>导出接口需要权限控制和操作日志。</li>
+</ol>
+<h2>7. 文件与存储设计</h2>
+<h3>7.1 文件分类</h3>
+<table>
+<tr><td>类型</td><td>可见性</td><td>示例</td></tr>
+<tr><td>商品展示文件</td><td>公开</td><td>封面、轮播图、截图</td></tr>
+<tr><td>内容文件</td><td>公开</td><td>帮助文章图片、活动图</td></tr>
+<tr><td>询单附件</td><td>私有</td><td>需求文档、问题截图</td></tr>
+<tr><td>付款凭证</td><td>私有</td><td>转账截图</td></tr>
+<tr><td>交付附件</td><td>私有</td><td>源码包、部署文档、账号资料</td></tr>
+<tr><td>售后附件</td><td>私有</td><td>报错截图、录屏</td></tr>
+</table>
+<h3>7.2 上传限制建议</h3>
+<table>
+<tr><td>文件类型</td><td>后缀</td><td>单文件大小</td></tr>
+<tr><td>图片</td><td>jpg、jpeg、png、webp</td><td>10 MB</td></tr>
+<tr><td>文档</td><td>pdf、doc、docx、xls、xlsx、md、txt</td><td>30 MB</td></tr>
+<tr><td>压缩包</td><td>zip、rar、7z</td><td>500 MB</td></tr>
+<tr><td>视频</td><td>mp4</td><td>500 MB</td></tr>
+</table>
+<h3>7.3 私有文件下载</h3>
+<p>私有文件下载流程：</p>
+<ol>
+<li>客户或管理员请求下载接口。</li>
+<li>服务端校验登录态和业务权限。</li>
+<li>服务端生成短期有效签名 URL。</li>
+<li>记录下载日志。</li>
+<li>客户端使用签名 URL 下载。</li>
+</ol>
+<h2>8. 消息通知设计</h2>
+<h3>8.1 消息类型</h3>
+<table>
+<tr><td>类型</td><td>触发场景</td><td>接收人</td></tr>
+<tr><td>询单通知</td><td>客户提交询单、管理员报价、询单转订单</td><td>客户、管理员</td></tr>
+<tr><td>订单通知</td><td>订单确认、取消、完成、状态变更</td><td>客户</td></tr>
+<tr><td>收款通知</td><td>客户上传凭证、管理员确认或驳回</td><td>客户、管理员</td></tr>
+<tr><td>交付通知</td><td>管理员添加或更新交付资料</td><td>客户</td></tr>
+<tr><td>售后通知</td><td>售后提交、回复、解决、关闭</td><td>客户、管理员</td></tr>
+<tr><td>系统公告</td><td>平台公告、规则变更</td><td>客户</td></tr>
+</table>
+<h3>8.2 发送策略</h3>
+<ol>
+<li>站内信为基础能力，所有关键事件必须落站内信。</li>
+<li>微信订阅消息仅在用户授权后发送，发送失败需记录。</li>
+<li>后台待办通过接口实时统计，不强依赖消息推送。</li>
+</ol>
+<h2>9. 埋点设计</h2>
+<table>
+<tr><td>事件名</td><td>触发时机</td><td>关键属性</td></tr>
+<tr><td><code>home_view</code></td><td>访问首页</td><td>来源、访客 ID</td></tr>
+<tr><td><code>banner_click</code></td><td>点击 Banner</td><td>Banner ID、跳转类型</td></tr>
+<tr><td><code>search_submit</code></td><td>提交搜索</td><td>关键词、结果数</td></tr>
+<tr><td><code>product_view</code></td><td>查看商品详情</td><td>商品 ID、分类 ID</td></tr>
+<tr><td><code>product_favorite</code></td><td>收藏商品</td><td>商品 ID</td></tr>
+<tr><td><code>product_inquiry_submit</code></td><td>提交商品意向</td><td>商品 ID、是否需要部署</td></tr>
+<tr><td><code>service_view</code></td><td>查看服务详情</td><td>服务 ID</td></tr>
+<tr><td><code>service_inquiry_submit</code></td><td>提交服务预约</td><td>服务 ID、需求类型</td></tr>
+<tr><td><code>custom_inquiry_submit</code></td><td>提交定制需求</td><td>需求类型、预算</td></tr>
+<tr><td><code>payment_voucher_submit</code></td><td>上传付款凭证</td><td>订单 ID、金额</td></tr>
+<tr><td><code>delivery_view</code></td><td>查看交付资料</td><td>订单 ID、交付 ID</td></tr>
+<tr><td><code>after_sale_submit</code></td><td>提交售后</td><td>订单 ID、售后类型</td></tr>
+</table>
+<h2>10. 非功能设计</h2>
+<h3>10.1 性能指标</h3>
+<table>
+<tr><td>场景</td><td>指标</td></tr>
+<tr><td>小程序首页首屏</td><td>2 秒内返回核心数据</td></tr>
+<tr><td>商品列表接口</td><td>500 毫秒内返回</td></tr>
+<tr><td>商品详情接口</td><td>800 毫秒内返回</td></tr>
+<tr><td>后台列表查询</td><td>1 秒内返回</td></tr>
+<tr><td>文件上传</td><td>大文件走对象存储直传或分片上传</td></tr>
+</table>
+<h3>10.2 可用性</h3>
+<ol>
+<li>商品浏览、询单提交、订单查看、交付查看为核心链路，需要优先保障。</li>
+<li>客户提交询单、付款凭证和售后后必须返回明确状态和提示。</li>
+<li>后台首页突出待跟进、待确认收款、待交付和售后待处理。</li>
+</ol>
+<h3>10.3 扩展性</h3>
+<ol>
+<li><code>orders.payment_status</code>、<code>payment_records.payment_method</code> 已预留在线支付扩展。</li>
+<li><code>order_items.snapshot</code> 支持保存下单时商品快照，避免商品变更影响历史订单。</li>
+<li>商品、服务、询单、订单均使用类型字段支持新业务形态。</li>
+<li>配置项、分类、标签、付款方式、交付类型可字典化扩展。</li>
+</ol>
+<h2>11. 部署设计</h2>
+<h3>11.1 环境划分</h3>
+<table>
+<tr><td>环境</td><td>用途</td></tr>
+<tr><td>dev</td><td>本地开发和联调</td></tr>
+<tr><td>test</td><td>测试验收</td></tr>
+<tr><td>prod</td><td>正式运行</td></tr>
+</table>
+<h3>11.2 推荐部署拓扑</h3>
+<pre><code>
+Nginx
+  |-- 管理后台静态资源
+  |-- API 反向代理
+应用服务
+  |-- MySQL
+  |-- Redis
+  |-- 对象存储
+  |-- 日志与监控
+微信小程序
+  |-- HTTPS API
+</code></pre>
+<h3>11.3 配置项</h3>
+<table>
+<tr><td>配置</td><td>说明</td></tr>
+<tr><td><code>WECHAT_APP_ID</code></td><td>小程序 AppID</td></tr>
+<tr><td><code>WECHAT_APP_SECRET</code></td><td>小程序密钥</td></tr>
+<tr><td><code>JWT_SECRET</code></td><td>Token 签名密钥</td></tr>
+<tr><td><code>MYSQL_DSN</code></td><td>数据库连接</td></tr>
+<tr><td><code>REDIS_DSN</code></td><td>Redis 连接</td></tr>
+<tr><td><code>STORAGE_BUCKET_PUBLIC</code></td><td>公开文件桶</td></tr>
+<tr><td><code>STORAGE_BUCKET_PRIVATE</code></td><td>私有文件桶</td></tr>
+<tr><td><code>UPLOAD_MAX_SIZE</code></td><td>上传大小限制</td></tr>
+<tr><td><code>PAYMENT_INSTRUCTION</code></td><td>默认付款说明</td></tr>
+</table>
+<h2>12. 测试与验收</h2>
+<h3>12.1 核心测试用例</h3>
+<table>
+<tr><td>模块</td><td>测试点</td></tr>
+<tr><td>登录</td><td>微信登录、Token 过期、手机号绑定</td></tr>
+<tr><td>商品</td><td>上架商品可见，下架商品不可见，筛选排序正确</td></tr>
+<tr><td>服务</td><td>服务详情、套餐展示、预约提交</td></tr>
+<tr><td>询单</td><td>商品意向、服务预约、定制需求提交，后台跟进和报价</td></tr>
+<tr><td>订单</td><td>询单转订单、金额修改、订单状态流转</td></tr>
+<tr><td>收款</td><td>客户上传凭证、后台确认、驳回、部分收款、作废</td></tr>
+<tr><td>交付</td><td>添加交付、客户查看、客户确认、私有权限校验</td></tr>
+<tr><td>售后</td><td>创建售后、后台回复、解决、关闭</td></tr>
+<tr><td>权限</td><td>不同后台角色菜单与操作权限</td></tr>
+<tr><td>文件</td><td>公开文件访问、私有文件鉴权、格式和大小限制</td></tr>
+<tr><td>消息</td><td>关键状态变更生成站内信</td></tr>
+</table>
+<h3>12.2 验收标准</h3>
+<ol>
+<li>管理员可新增、编辑、上架、下架源码商品和技术服务。</li>
+<li>客户可浏览、搜索、筛选、收藏商品和服务。</li>
+<li>客户可提交购买意向、服务预约和定制需求。</li>
+<li>管理员可跟进询单、报价并转为订单。</li>
+<li>管理员可修改订单金额、确认订单、取消订单和完成订单。</li>
+<li>客户可上传付款凭证，管理员可确认、驳回、作废收款记录。</li>
+<li>管理员可添加交付资料，客户只能查看自己订单下的可见交付。</li>
+<li>客户可提交售后，管理员可处理和关闭售后。</li>
+<li>后台可按权限控制敏感操作，关键操作有日志。</li>
+<li>系统不依赖在线支付也能完成从询单到收款、交付、售后的业务记录。</li>
+</ol>
+<h2>13. 后续扩展预留</h2>
+<table>
+<tr><td>扩展方向</td><td>预留方式</td></tr>
+<tr><td>在线支付</td><td>在订单和收款记录中预留付款状态、支付方式、流水号</td></tr>
+<tr><td>自动发货</td><td>交付记录可配置客户可见，后续可按付款状态自动开放</td></tr>
+<tr><td>电子合同</td><td>订单维度增加合同表和签署状态</td></tr>
+<tr><td>优惠券自动核销</td><td>订单金额结构已区分优惠金额</td></tr>
+<tr><td>发票管理</td><td>订单维度可扩展发票申请和开票记录</td></tr>
+<tr><td>企业微信客服</td><td>客户表保留联系微信和来源，消息模块可扩展客服会话</td></tr>
+<tr><td>会员体系</td><td>客户标签和成交记录可扩展客户等级</td></tr>
+</table>
+</body>
+</html>

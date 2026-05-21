@@ -1,0 +1,14 @@
+{
+  "name": "源码与技术服务选购平台",
+  "appid": "__UNI__SOURCE_SHOP",
+  "description": "源码产品、软件成品与技术服务选购小程序",
+  "versionName": "0.1.0",
+  "versionCode": "1",
+  "mp-weixin": {
+    "appid": "",
+    "setting": {
+      "urlCheck": false
+    },
+    "usingComponents": true
+  }
+}

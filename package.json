@@ -1,0 +1,21 @@
+{
+  "name": "source-service-shop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "源码与技术服务选购小程序及管理系统",
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "pnpm --parallel --filter @source-shop/api --filter @source-shop/admin dev",
+    "dev:api": "pnpm --filter @source-shop/api dev",
+    "dev:admin": "pnpm --filter @source-shop/admin dev",
+    "dev:mini": "pnpm --filter @source-shop/mini dev:mp-weixin",
+    "build": "pnpm -r build",
+    "build:admin": "pnpm --filter @source-shop/admin build",
+    "build:mini": "pnpm --filter @source-shop/mini build:mp-weixin",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "typescript": "5.4.5"
+  }
+}

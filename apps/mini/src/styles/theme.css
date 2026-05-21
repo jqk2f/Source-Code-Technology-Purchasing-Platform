@@ -1,0 +1,37 @@
+:root,
+page {
+  --theme-primary: #1677ff;
+  --theme-success: #16a34a;
+  --theme-warning: #f59e0b;
+  --theme-error: #dc2626;
+  --theme-page-bg: #f6f8fb;
+  --theme-surface-bg: #ffffff;
+  --theme-text: #111827;
+  --theme-muted: #6b7280;
+  --theme-border: #e5e7eb;
+  --theme-radius: 8px;
+}
+
+.page {
+  min-height: 100vh;
+  padding: 24rpx;
+  box-sizing: border-box;
+}
+
+.card {
+  background: var(--theme-surface-bg);
+  border-radius: var(--theme-radius);
+  padding: 24rpx;
+  box-sizing: border-box;
+  border: 1px solid var(--theme-border);
+}
+
+.btn-primary {
+  background: var(--theme-primary);
+  color: #fff;
+  border-radius: var(--theme-radius);
+}
+
+.muted {
+  color: var(--theme-muted);
+}
