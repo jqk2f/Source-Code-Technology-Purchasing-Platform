@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { message } from "ant-design-vue";
 import { reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
@@ -11,10 +12,19 @@ const loading = ref(false);
 const form = reactive({ username: "admin", password: "admin123" });
 
 async function submit() {
+  if (loading.value) return;
+  if (!form.username || !form.password) {
+    message.warning("请输入用户名和密码");
+    return;
+  }
+
   loading.value = true;
   try {
     await auth.login(form.username, form.password);
+    message.success("登录成功");
     router.push("/dashboard");
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : "登录失败");
   } finally {
     loading.value = false;
   }
@@ -33,17 +43,25 @@ async function submit() {
       </div>
       <div class="text-sm text-gray-500">MVP 默认账号：admin / admin123</div>
     </section>
+
     <section class="bg-white p-12 flex items-center justify-center">
       <a-card class="w-[420px]" :bordered="false">
         <h2 class="text-2xl font-semibold mb-6">后台登录</h2>
-        <a-form layout="vertical" @finish="submit">
+        <a-form layout="vertical" @finish="submit" @submit.prevent="submit">
           <a-form-item label="用户名" required>
-            <a-input v-model:value="form.username" size="large" />
+            <a-input v-model:value="form.username" size="large" autocomplete="username" @press-enter="submit" />
           </a-form-item>
           <a-form-item label="密码" required>
-            <a-input-password v-model:value="form.password" size="large" />
+            <a-input-password
+              v-model:value="form.password"
+              size="large"
+              autocomplete="current-password"
+              @press-enter="submit"
+            />
           </a-form-item>
-          <a-button type="primary" html-type="submit" size="large" block :loading="loading">登录</a-button>
+          <a-button type="primary" html-type="submit" size="large" block :loading="loading" @click="submit">
+            登录
+          </a-button>
         </a-form>
       </a-card>
     </section>

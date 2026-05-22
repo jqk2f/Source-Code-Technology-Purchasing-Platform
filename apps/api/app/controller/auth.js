@@ -17,6 +17,11 @@ class AuthController extends Controller {
     const result = await this.ctx.service.auth.adminLogin({ username, password });
     this.ctx.success(result);
   }
+
+  async adminRefresh() {
+    const result = await this.ctx.service.auth.refreshAdmin(this.ctx.state.user.id);
+    this.ctx.success(result);
+  }
 }
 
 module.exports = AuthController;

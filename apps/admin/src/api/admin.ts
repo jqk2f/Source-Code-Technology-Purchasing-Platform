@@ -12,6 +12,10 @@ export function login(username: string, password: string) {
   return http.post<LoginResult>("/admin/auth/login", { username, password });
 }
 
+export function refreshToken() {
+  return http.post<LoginResult>("/admin/auth/refresh");
+}
+
 export function getOverview() {
   return http.get<DashboardOverview>("/admin/dashboard/overview");
 }

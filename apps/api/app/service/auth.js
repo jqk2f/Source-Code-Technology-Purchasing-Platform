@@ -60,6 +60,32 @@ class AuthService extends BaseService {
     const token = this.sign({ id: admin.id, type: "admin", permissions: permissions.map((item) => item.code) }, "12h");
     return { token, user: admin, roles, permissions, menus: permissions.filter((item) => item.type === "menu") };
   }
+
+  async refreshAdmin(adminId) {
+    const admin = await this.first("SELECT * FROM admin_users WHERE id = :adminId AND deleted_at IS NULL", { adminId });
+    if (!admin || admin.status !== "enabled") {
+      const error = new Error("账号不存在或已禁用");
+      error.status = 401;
+      throw error;
+    }
+    const roles = await this.query(
+      `SELECT r.code, r.name
+       FROM admin_roles r
+       JOIN admin_user_roles ur ON ur.role_id = r.id
+       WHERE ur.admin_user_id = :id AND r.status = 'enabled'`,
+      { id: admin.id }
+    );
+    const permissions = await this.query(
+      `SELECT DISTINCT p.code, p.name, p.type, p.path, p.parent_id
+       FROM admin_permissions p
+       JOIN admin_role_permissions rp ON rp.permission_id = p.id
+       JOIN admin_user_roles ur ON ur.role_id = rp.role_id
+       WHERE ur.admin_user_id = :id`,
+      { id: admin.id }
+    );
+    const token = this.sign({ id: admin.id, type: "admin", permissions: permissions.map((item) => item.code) }, "12h");
+    return { token, user: admin, roles, permissions, menus: permissions.filter((item) => item.type === "menu") };
+  }
 }
 
 module.exports = AuthService;

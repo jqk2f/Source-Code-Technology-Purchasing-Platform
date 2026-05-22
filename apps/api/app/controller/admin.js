@@ -73,6 +73,24 @@ class AdminController extends Controller {
   async afterSales() {
     this.ctx.success(await this.ctx.service.admin.afterSales(this.ctx.query));
   }
+
+  async listResource() {
+    this.ctx.success(await this.ctx.service.admin.listResource(this.ctx.params.resource, this.ctx.query));
+  }
+
+  async createResource() {
+    this.ctx.success(await this.ctx.service.admin.createResource(this.ctx.params.resource, this.ctx.request.body || {}));
+  }
+
+  async updateResource() {
+    this.ctx.success(
+      await this.ctx.service.admin.updateResource(this.ctx.params.resource, Number(this.ctx.params.id), this.ctx.request.body || {})
+    );
+  }
+
+  async deleteResource() {
+    this.ctx.success(await this.ctx.service.admin.deleteResource(this.ctx.params.resource, Number(this.ctx.params.id)));
+  }
 }
 
 module.exports = AdminController;

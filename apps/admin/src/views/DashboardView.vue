@@ -55,7 +55,7 @@ onMounted(async () => {
         type="info"
         show-icon
         message="当前版本按人工确认交易设计"
-        description="请优先处理待跟进询单、待确认收款和待交付订单，所有敏感操作会在后续操作日志模块中沉淀。"
+        description="请优先处理待跟进询单、待确认收款和待交付订单。所有敏感操作后续可继续沉淀到操作日志模块。"
       />
     </a-card>
   </a-spin>

@@ -22,7 +22,12 @@ module.exports = (app) => {
   router.post("/api/v1/mini/orders/:id/payment-vouchers", customerAuth, controller.mini.uploadPaymentVoucher);
 
   router.post("/api/v1/admin/auth/login", controller.auth.adminLogin);
+  router.post("/api/v1/admin/auth/refresh", adminAuth, controller.auth.adminRefresh);
   router.get("/api/v1/admin/dashboard/overview", adminAuth, controller.admin.overview);
+  router.get("/api/v1/admin/resources/:resource", adminAuth, controller.admin.listResource);
+  router.post("/api/v1/admin/resources/:resource", adminAuth, controller.admin.createResource);
+  router.put("/api/v1/admin/resources/:resource/:id", adminAuth, controller.admin.updateResource);
+  router.delete("/api/v1/admin/resources/:resource/:id", adminAuth, controller.admin.deleteResource);
   router.get("/api/v1/admin/products", adminAuth, controller.admin.products);
   router.get("/api/v1/admin/services", adminAuth, controller.admin.services);
   router.get("/api/v1/admin/customers", adminAuth, controller.admin.customers);
