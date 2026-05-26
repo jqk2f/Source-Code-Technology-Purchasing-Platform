@@ -1,7 +1,7 @@
 import { defaultTheme, type ThemeTokens } from "@source-shop/shared";
 import { defineStore } from "pinia";
 
-const storageKey = "source-shop-mini-theme";
+const storageKey = "source-shop-mobile-theme";
 
 export const useThemeStore = defineStore("theme", {
   state: () => ({

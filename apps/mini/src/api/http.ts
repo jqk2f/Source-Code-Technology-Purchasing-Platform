@@ -1,10 +1,12 @@
 import type { ApiResponse } from "@source-shop/shared";
 import { apiBaseUrl } from "@/config/app";
 
-type MiniRequestOptions = Omit<UniApp.RequestOptions, "url">;
+type MobileRequestOptions = Omit<UniApp.RequestOptions, "url">;
 
-export function request<T>(path: string, options: MiniRequestOptions = {}): Promise<T> {
-  const token = uni.getStorageSync("source-shop-mini-token");
+const tokenKey = "source-shop-mobile-token";
+
+export function request<T>(path: string, options: MobileRequestOptions = {}): Promise<T> {
+  const token = uni.getStorageSync(tokenKey);
   return new Promise((resolve, reject) => {
     uni.request({
       ...options,

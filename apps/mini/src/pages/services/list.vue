@@ -8,10 +8,16 @@ import { useThemeStore } from "@/stores/theme";
 const theme = useThemeStore();
 const query = reactive({ page: 1, pageSize: 20, keyword: "" });
 const list = ref<ServiceSummary[]>([]);
+const loading = ref(false);
 
 async function load() {
-  const data = await getServices(query);
-  list.value = data.list;
+  loading.value = true;
+  try {
+    const data = await getServices(query);
+    list.value = data.list;
+  } finally {
+    loading.value = false;
+  }
 }
 
 onMounted(load);
@@ -24,6 +30,7 @@ onMounted(load);
       <button class="btn-primary" size="mini" @tap="load">搜索</button>
     </view>
     <ProductCard v-for="item in list" :key="item.id" :item="item" type="service" />
+    <view v-if="loading" class="loading">加载中...</view>
   </view>
 </template>
 
@@ -39,5 +46,10 @@ input {
 }
 button {
   margin: 0;
+}
+.loading {
+  color: var(--theme-muted);
+  text-align: center;
+  padding: 24rpx 0;
 }
 </style>

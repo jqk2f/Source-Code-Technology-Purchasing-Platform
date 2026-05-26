@@ -1,12 +1,13 @@
 {
-  "name": "@source-shop/mini",
+  "name": "@source-shop/mobile",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev:mp-weixin": "uni -p mp-weixin",
-    "build:mp-weixin": "uni build -p mp-weixin",
-    "build": "uni build -p mp-weixin",
+    "dev:h5": "uni -p h5",
+    "build:h5": "uni build -p h5",
+    "preview:h5": "vite preview --host 0.0.0.0 --port 4174",
+    "build": "uni build -p h5",
     "lint": "vue-tsc --noEmit",
     "typecheck": "vue-tsc --noEmit"
   },
@@ -14,7 +15,6 @@
     "@dcloudio/uni-app": "3.0.0-alpha-5010120260519001",
     "@dcloudio/uni-components": "3.0.0-alpha-5010120260519001",
     "@dcloudio/uni-h5": "3.0.0-alpha-5010120260519001",
-    "@dcloudio/uni-mp-weixin": "3.0.0-alpha-5010120260519001",
     "@source-shop/shared": "workspace:*",
     "pinia": "2.1.7",
     "vue": "3.4.21"

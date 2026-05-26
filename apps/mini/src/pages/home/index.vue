@@ -8,7 +8,6 @@ import { useThemeStore } from "@/stores/theme";
 
 const theme = useThemeStore();
 const loading = ref(false);
-const banners = ref<any[]>([]);
 const categories = ref<Array<{ id: number; name: string; type: string }>>([]);
 const products = ref<ProductSummary[]>([]);
 const services = ref<ServiceSummary[]>([]);
@@ -17,10 +16,9 @@ async function load() {
   loading.value = true;
   try {
     const data = await getHome();
-    banners.value = data.banners;
-    categories.value = data.categories;
-    products.value = data.recommendedProducts;
-    services.value = data.hotServices;
+    categories.value = data.categories || [];
+    products.value = data.recommendedProducts || [];
+    services.value = data.hotServices || [];
   } finally {
     loading.value = false;
   }
@@ -55,6 +53,8 @@ function goServices() {
 
     <SectionTitle title="热门服务" more-text="全部" @more="goServices" />
     <ProductCard v-for="item in services" :key="item.id" :item="item" type="service" />
+
+    <view v-if="loading" class="loading">加载中...</view>
   </view>
 </template>
 
@@ -91,5 +91,10 @@ function goServices() {
   padding: 20rpx 8rpx;
   text-align: center;
   font-size: 25rpx;
+}
+.loading {
+  color: var(--theme-muted);
+  text-align: center;
+  padding: 24rpx 0;
 }
 </style>

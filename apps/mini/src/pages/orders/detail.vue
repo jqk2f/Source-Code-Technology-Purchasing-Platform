@@ -36,8 +36,8 @@ async function submitPayment() {
       <text class="muted">{{ detail.orderNo }}</text>
       <view class="status">{{ statusText[detail.status] || detail.status }}</view>
       <view class="money">
-        <text>应收：￥{{ detail.payableAmount || 0 }}</text>
-        <text>已收：￥{{ detail.paidAmount || 0 }}</text>
+        <text>应收：¥{{ detail.payableAmount || 0 }}</text>
+        <text>已收：¥{{ detail.paidAmount || 0 }}</text>
       </view>
     </view>
 

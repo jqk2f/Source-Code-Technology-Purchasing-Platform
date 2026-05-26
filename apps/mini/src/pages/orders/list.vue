@@ -31,7 +31,7 @@ onShow(load);
 
 <template>
   <view class="page" :style="theme.cssVars">
-    <view v-if="!orders.length" class="card empty">
+    <view v-if="!orders.length && !loading" class="card empty">
       <text>暂无订单。提交购买意向后，管理员确认报价会生成订单。</text>
     </view>
     <view v-for="item in orders" :key="item.id" class="card order" @tap="go(item.id)">
@@ -41,10 +41,11 @@ onShow(load);
       </view>
       <text class="no">{{ item.orderNo }}</text>
       <view class="amount">
-        <text>应收 ￥{{ item.payableAmount }}</text>
-        <text>已收 ￥{{ item.paidAmount }}</text>
+        <text>应收 ¥{{ item.payableAmount || 0 }}</text>
+        <text>已收 ¥{{ item.paidAmount || 0 }}</text>
       </view>
     </view>
+    <view v-if="loading" class="loading">加载中...</view>
   </view>
 </template>
 
@@ -79,5 +80,10 @@ onShow(load);
 .amount {
   color: var(--theme-muted);
   font-size: 24rpx;
+}
+.loading {
+  color: var(--theme-muted);
+  text-align: center;
+  padding: 24rpx 0;
 }
 </style>

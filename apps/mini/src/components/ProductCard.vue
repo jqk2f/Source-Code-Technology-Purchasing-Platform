@@ -1,35 +1,36 @@
 <script setup lang="ts">
 import type { ProductSummary, ServiceSummary } from "@source-shop/shared";
 
-defineProps<{ item: ProductSummary | ServiceSummary; type: "product" | "service" }>();
+const props = defineProps<{ item: ProductSummary | ServiceSummary; type: "product" | "service" }>();
 
-function go(id: number, type: "product" | "service") {
-  uni.navigateTo({ url: `/pages/${type === "product" ? "products" : "services"}/detail?id=${id}` });
+function go() {
+  uni.navigateTo({ url: `/pages/${props.type === "product" ? "products" : "services"}/detail?id=${props.item.id}` });
 }
 
 function displayName(item: ProductSummary | ServiceSummary) {
   return "title" in item ? item.title : item.name;
 }
 
-function displayDesc(item: ProductSummary | ServiceSummary, type: "product" | "service") {
+function displayDesc(item: ProductSummary | ServiceSummary) {
   if (item.subtitle) return item.subtitle;
-  if (type === "product") return (item as ProductSummary).techStack || "可咨询详情";
-  return (item as ServiceSummary).servicePeriod || "可咨询详情";
+  if ("techStack" in item && item.techStack) return item.techStack;
+  if ("servicePeriod" in item && item.servicePeriod) return item.servicePeriod;
+  return "可咨询详情";
 }
 
 function displayPrice(item: ProductSummary | ServiceSummary) {
   if (item.priceText) return item.priceText;
-  if ("price" in item && item.price) return `￥${item.price}`;
-  return `￥${item.startPrice || 0} 起`;
+  if ("price" in item && item.price) return `¥${item.price}`;
+  return `¥${item.startPrice || 0} 起`;
 }
 </script>
 
 <template>
-  <view class="card product-card" @tap="go(item.id, type)">
+  <view class="card product-card" @tap="go">
     <image class="cover" :src="item.coverUrl || 'https://dummyimage.com/300x200/e5e7eb/6b7280&text=Source'" mode="aspectFill" />
     <view class="body">
       <text class="name">{{ displayName(item) }}</text>
-      <text class="desc">{{ displayDesc(item, type) }}</text>
+      <text class="desc">{{ displayDesc(item) }}</text>
       <view class="bottom">
         <text class="price">{{ displayPrice(item) }}</text>
         <text class="tag">{{ type === "product" ? "源码" : "服务" }}</text>

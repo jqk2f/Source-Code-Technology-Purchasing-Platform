@@ -55,7 +55,7 @@ async function submit() {
       <input v-model="form.title" placeholder="例如：购买商城源码并部署" />
 
       <label>需求说明</label>
-      <textarea v-model="form.description" placeholder="请补充购买数量、是否需要部署、二开需求、当前环境等" />
+      <textarea v-model="form.description" placeholder="补充购买数量、部署环境、二开需求等" />
 
       <label>联系人</label>
       <input v-model="form.contactName" placeholder="请输入联系人" />

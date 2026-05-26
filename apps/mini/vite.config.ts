@@ -10,5 +10,9 @@ const uni =
       : (uniModule.default as { default: () => unknown }).default;
 
 export default defineConfig({
-  plugins: [uni()]
+  plugins: [uni()],
+  server: {
+    host: "0.0.0.0",
+    port: 5174
+  }
 });

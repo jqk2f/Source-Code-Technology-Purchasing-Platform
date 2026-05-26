@@ -11,6 +11,11 @@ onLoad(async (query = {}) => {
   detail.value = await getServiceDetail(Number(query.id));
 });
 
+function displayPrice() {
+  if (detail.value.priceText) return detail.value.priceText;
+  return `¥${detail.value.startPrice || 0} 起`;
+}
+
 function submitInquiry() {
   uni.navigateTo({
     url: `/pages/inquiries/create?sourceType=service&sourceId=${detail.value.id}&title=${encodeURIComponent(detail.value.name || "")}`
@@ -23,7 +28,7 @@ function submitInquiry() {
     <view class="card">
       <text class="title">{{ detail.name }}</text>
       <text class="subtitle">{{ detail.subtitle }}</text>
-      <text class="price">{{ detail.priceText || `￥${detail.startPrice || 0} 起` }}</text>
+      <text class="price">{{ displayPrice() }}</text>
     </view>
     <view class="card block">
       <text class="block-title">服务范围</text>

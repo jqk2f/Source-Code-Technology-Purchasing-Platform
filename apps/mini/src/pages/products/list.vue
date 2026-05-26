@@ -31,6 +31,7 @@ onMounted(() => load(true));
       <button class="btn-primary" size="mini" @tap="load(true)">搜索</button>
     </view>
     <ProductCard v-for="item in list" :key="item.id" :item="item" type="product" />
+    <view v-if="loading" class="loading">加载中...</view>
   </view>
 </template>
 
@@ -47,5 +48,10 @@ input {
 }
 button {
   margin: 0;
+}
+.loading {
+  color: var(--theme-muted);
+  text-align: center;
+  padding: 24rpx 0;
 }
 </style>

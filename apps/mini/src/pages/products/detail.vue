@@ -11,6 +11,11 @@ onLoad(async (query = {}) => {
   detail.value = await getProductDetail(Number(query.id));
 });
 
+function displayPrice() {
+  if (detail.value.priceText) return detail.value.priceText;
+  return `¥${detail.value.startPrice || detail.value.price || 0}`;
+}
+
 function submitInquiry() {
   uni.navigateTo({
     url: `/pages/inquiries/create?sourceType=product&sourceId=${detail.value.id}&title=${encodeURIComponent(detail.value.title || "")}`
@@ -24,7 +29,7 @@ function submitInquiry() {
     <view class="card detail">
       <text class="title">{{ detail.title }}</text>
       <text class="subtitle">{{ detail.subtitle }}</text>
-      <text class="price">{{ detail.priceText || `￥${detail.startPrice || detail.price || 0}` }}</text>
+      <text class="price">{{ displayPrice() }}</text>
       <view class="meta">{{ detail.techStack }}</view>
     </view>
 

@@ -7,7 +7,7 @@ const theme = useThemeStore();
 
 async function login() {
   await auth.ensureLogin();
-  uni.showToast({ title: "已登录", icon: "success" });
+  uni.showToast({ title: "已进入", icon: "success" });
 }
 
 function setBlue() {
@@ -32,13 +32,13 @@ function goCustomInquiry() {
     <view class="card profile">
       <view class="avatar">{{ auth.customer?.nickname?.slice(0, 1) || "客" }}</view>
       <view>
-        <text class="name">{{ auth.customer?.nickname || "微信客户" }}</text>
-        <text class="muted">{{ auth.token ? "已登录" : "未登录" }}</text>
+        <text class="name">{{ auth.customer?.nickname || "H5客户" }}</text>
+        <text class="muted">{{ auth.token ? "已进入" : "未进入" }}</text>
       </view>
     </view>
 
     <view class="card actions">
-      <button class="btn-primary" @tap="login">微信登录</button>
+      <button class="btn-primary" @tap="login">进入移动端</button>
       <button @tap="goOrders">订单中心</button>
       <button @tap="goCustomInquiry">提交定制需求</button>
     </view>
