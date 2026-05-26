@@ -11,4 +11,3 @@ coverage/
 *.local
 *.log
 releases/
-apps/api/releases/

@@ -1,0 +1,28 @@
+{
+  "name": "@source-shop/api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Egg.js API for source and service shop",
+  "scripts": {
+    "dev": "egg-bin dev --port=7001",
+    "start": "egg-scripts start --daemon --title=source-shop-api",
+    "start:production": "egg-scripts start --daemon --title=source-shop-api",
+    "stop": "egg-scripts stop --title=source-shop-api",
+    "build": "npm run lint && node scripts/build-release.js",
+    "lint": "node -c app/router.js && node -c app.js && node -c config/config.default.js && node -c config/env.js",
+    "typecheck": "node -c app/router.js && node -c app.js && node -c config/config.default.js && node -c config/env.js"
+  },
+  "dependencies": {
+    "dayjs": "^1.11.11",
+    "egg": "^3.28.0",
+    "egg-scripts": "^2.17.0",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.9.7"
+  },
+  "devDependencies": {
+    "egg-bin": "^6.9.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
