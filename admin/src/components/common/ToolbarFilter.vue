@@ -40,11 +40,7 @@ const emit = defineEmits<{
       <a-select-option value="on_sale">上架</a-select-option>
       <a-select-option value="off_sale">下架</a-select-option>
       <a-select-option value="pending_follow">待跟进</a-select-option>
-      <a-select-option value="pending_payment">待付款</a-select-option>
-      <a-select-option value="payment_confirming">待确认收款</a-select-option>
-      <a-select-option value="pending_delivery">待交付</a-select-option>
-      <a-select-option value="completed">已完成</a-select-option>
-      <a-select-option value="closed">已关闭</a-select-option>
+      <a-select-option value="contacted">已联系</a-select-option>
     </a-select>
     <a-button type="primary" :icon="h(Search, { size: 16 })" @click="emit('search')">查询</a-button>
     <a-button :icon="h(RefreshCw, { size: 16 })" @click="emit('refresh')">刷新</a-button>

@@ -26,27 +26,9 @@ export const clientModules: ClientModule[] = [
     color: "#0f766e"
   },
   {
-    key: "create-inquiry",
-    title: "提交需求",
-    subtitle: "定制开发、部署运维先沟通",
-    route: "/inquiries/create",
-    icon: "edit",
-    color: "#7c3aed",
-    authRequired: true
-  },
-  {
-    key: "orders",
-    title: "我的订单",
-    subtitle: "查看付款、交付和验收进度",
-    route: "/orders",
-    icon: "orders-o",
-    color: "#ea580c",
-    authRequired: true
-  },
-  {
     key: "inquiries",
-    title: "我的询单",
-    subtitle: "查看需求报价和沟通进度",
+    title: "我的预约",
+    subtitle: "查看预约跟进状态",
     route: "/inquiries",
     icon: "records-o",
     color: "#2563eb",

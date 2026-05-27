@@ -4,7 +4,7 @@ import { useRouter } from "vue-router";
 import { showToast } from "vant";
 import EmptyState from "@/components/EmptyState.vue";
 import { getInquiries } from "@/api/inquiry";
-import { formatDate, formatMoney, formatStatus, pickValue } from "@/utils/format";
+import { formatDate, formatStatus, pickValue } from "@/utils/format";
 
 const router = useRouter();
 const status = ref("");
@@ -13,8 +13,7 @@ const list = ref<Record<string, unknown>[]>([]);
 const tabs = [
   { title: "全部", name: "" },
   { title: "待跟进", name: "pending_follow" },
-  { title: "已报价", name: "quoted" },
-  { title: "已转单", name: "converted" }
+  { title: "已联系", name: "contacted" }
 ];
 
 async function load() {
@@ -39,7 +38,7 @@ onMounted(load);
       <van-tab v-for="item in tabs" :key="item.name" :title="item.title" :name="item.name" />
     </van-tabs>
     <div class="toolbar">
-      <van-button type="primary" icon="plus" size="small" @click="router.push('/inquiries/create')">提交需求</van-button>
+      <van-button type="primary" icon="plus" size="small" @click="router.push('/products')">去预约</van-button>
     </div>
     <van-loading v-if="loading" class="loading" />
     <div v-else class="list">
@@ -48,14 +47,13 @@ onMounted(load);
           <strong>{{ pickValue(item, "title") }}</strong>
           <van-tag type="primary" plain>{{ formatStatus(pickValue(item, "status")) }}</van-tag>
         </div>
-        <p>{{ pickValue(item, "description") || "需求内容待补充" }}</p>
+        <p>{{ pickValue(item, "description") || "预约说明待补充" }}</p>
         <div class="meta">
           <span>{{ pickValue(item, "inquiryNo", "inquiry_no") }}</span>
-          <span>{{ formatMoney(pickValue(item, "quoteAmount", "quote_amount")) }}</span>
           <span>{{ formatDate(pickValue(item, "createdAt", "created_at")) }}</span>
         </div>
       </article>
-      <EmptyState v-if="list.length === 0" description="暂无询单记录" />
+      <EmptyState v-if="list.length === 0" description="暂无预约记录" />
     </div>
   </main>
 </template>

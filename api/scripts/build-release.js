@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const appRoot = path.resolve(__dirname, "..");
-const releaseRoot = path.resolve(appRoot, "..", "dist");
+const releaseRoot = path.resolve(appRoot, "releases");
 const releaseDir = path.join(releaseRoot, "source-shop-api");
 
 const entries = [
@@ -46,8 +46,26 @@ function copyRecursive(source, target) {
   fs.copyFileSync(source, target);
 }
 
-fs.rmSync(releaseDir, { recursive: true, force: true });
+function makeWritable(target) {
+  if (!fs.existsSync(target)) return;
+  const stat = fs.lstatSync(target);
+  fs.chmodSync(target, 0o666);
+  if (!stat.isDirectory()) return;
+  for (const entry of fs.readdirSync(target)) {
+    makeWritable(path.join(target, entry));
+  }
+}
+
+function removeManaged(target) {
+  if (!fs.existsSync(target)) return;
+  makeWritable(target);
+  fs.rmSync(target, { recursive: true, force: true });
+}
+
 fs.mkdirSync(releaseDir, { recursive: true });
+for (const entry of [...entries, "env.production.example", "DEPLOY.md"]) {
+  removeManaged(path.join(releaseDir, entry));
+}
 
 for (const entry of entries) {
   const source = path.join(appRoot, entry);

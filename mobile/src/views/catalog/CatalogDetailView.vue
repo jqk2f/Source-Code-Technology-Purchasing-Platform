@@ -13,7 +13,7 @@ const detail = ref<Record<string, unknown> | null>(null);
 const catalogType = computed(() => (route.meta.catalogType === "service" ? "service" : "product"));
 const title = computed(() => String(pickValue(detail.value || {}, "title", "name") || "详情"));
 const cover = computed(() => String(pickValue(detail.value || {}, "coverUrl", "cover_url") || ""));
-const price = computed(() => pickValue(detail.value || {}, "priceText", "price_text") || formatMoney(pickValue(detail.value || {}, "startPrice", "start_price", "price")));
+const price = computed(() => formatMoney(pickValue(detail.value || {}, catalogType.value === "service" ? "startPrice" : "price", catalogType.value === "service" ? "start_price" : "price")));
 const intro = computed(() =>
   String(
     pickValue(
@@ -22,7 +22,7 @@ const intro = computed(() =>
       catalogType.value === "service" ? "service_scope" : "feature_intro",
       "subtitle",
       "description"
-    ) || "项目资料整理中，可提交需求后进一步确认。"
+    ) || "项目资料整理中，可预约客服进一步确认。"
   )
 );
 
@@ -38,23 +38,17 @@ async function load() {
   }
 }
 
-function createInquiry() {
+function openContact() {
+  window.dispatchEvent(new Event("open-contact-panel"));
+}
+
+function registerIntent() {
   router.push({
     path: "/inquiries/create",
     query: {
       sourceType: catalogType.value,
       sourceId: String(route.params.id),
       title: title.value
-    }
-  });
-}
-
-function createOrder() {
-  router.push({
-    path: "/checkout",
-    query: {
-      sourceType: catalogType.value,
-      sourceId: String(route.params.id)
     }
   });
 }
@@ -75,16 +69,15 @@ onMounted(load);
         </div>
         <div class="body">
           <h1>{{ title }}</h1>
-          <p>{{ pickValue(detail, "subtitle") || "源码和服务过程可追踪" }}</p>
+          <p>{{ catalogType === "service" ? pickValue(detail, "subtitle") || "技术服务可预约沟通" : "源码产品可预约沟通" }}</p>
           <div class="price">{{ price }}</div>
         </div>
       </section>
 
       <van-cell-group inset title="核心信息">
         <van-cell v-if="catalogType === 'product'" title="技术栈" :value="String(pickValue(detail, 'techStack', 'tech_stack') || '按资料为准')" />
-        <van-cell v-if="catalogType === 'service'" title="服务周期" :value="String(pickValue(detail, 'servicePeriod', 'service_period') || '按需评估')" />
+        <van-cell v-if="catalogType === 'product' && pickValue(detail, 'demoUrl', 'demo_url')" title="演示地址" :value="String(pickValue(detail, 'demoUrl', 'demo_url'))" is-link :url="String(pickValue(detail, 'demoUrl', 'demo_url'))" />
         <van-cell v-if="catalogType === 'service'" title="服务方式" :value="String(pickValue(detail, 'serviceMethod', 'service_method') || '远程/线上')" />
-        <van-cell title="浏览量" :value="String(pickValue(detail, 'viewCount', 'view_count') || 0)" />
       </van-cell-group>
 
       <section class="content soft-card">
@@ -92,10 +85,29 @@ onMounted(load);
         <p>{{ intro }}</p>
       </section>
 
+      <section v-if="catalogType === 'product' && pickValue(detail, 'deliveryContent', 'delivery_content')" class="content soft-card">
+        <h2>交付内容</h2>
+        <p>{{ pickValue(detail, "deliveryContent", "delivery_content") }}</p>
+      </section>
+
+      <section v-if="catalogType === 'product' && pickValue(detail, 'purchaseNotice', 'purchase_notice')" class="content soft-card">
+        <h2>购买须知</h2>
+        <p>{{ pickValue(detail, "purchaseNotice", "purchase_notice") }}</p>
+      </section>
+
+      <section v-if="catalogType === 'service' && pickValue(detail, 'deliveryStandard', 'delivery_standard')" class="content soft-card">
+        <h2>交付标准</h2>
+        <p>{{ pickValue(detail, "deliveryStandard", "delivery_standard") }}</p>
+      </section>
+
+      <section v-if="catalogType === 'service' && pickValue(detail, 'excludedContent', 'excluded_content')" class="content soft-card">
+        <h2>不包含内容</h2>
+        <p>{{ pickValue(detail, "excludedContent", "excluded_content") }}</p>
+      </section>
+
       <van-action-bar>
-        <van-action-bar-icon icon="chat-o" text="咨询" @click="createInquiry" />
-        <van-action-bar-button type="warning" text="提交需求" @click="createInquiry" />
-        <van-action-bar-button type="primary" text="立即下单" @click="createOrder" />
+        <van-action-bar-icon icon="chat-o" text="客服" @click="openContact" />
+        <van-action-bar-button type="primary" text="预约服务" @click="registerIntent" />
       </van-action-bar>
     </template>
     <EmptyState v-else description="详情不存在或已下架" />
@@ -155,4 +167,5 @@ h2 {
   margin: 0 0 10px;
   font-size: 16px;
 }
+
 </style>

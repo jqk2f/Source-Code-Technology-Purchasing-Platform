@@ -6,8 +6,8 @@ export interface CustomerProfile {
   avatarUrl?: string;
   avatar_url?: string;
   mobile?: string;
-  companyName?: string;
-  company_name?: string;
+  contactWechat?: string;
+  contact_wechat?: string;
 }
 
 export interface AuthResult {
@@ -26,7 +26,7 @@ export function mobileLogin(payload: { account: string; password?: string; nickn
   });
 }
 
-export function mobileRegister(payload: { mobile: string; password?: string; nickname: string; companyName?: string }) {
+export function mobileRegister(payload: { mobile: string; password?: string; nickname: string; contactWechat?: string }) {
   return request<AuthResult>("/mini/auth/wechat-login", {
     method: "POST",
     data: {
@@ -34,7 +34,14 @@ export function mobileRegister(payload: { mobile: string; password?: string; nic
       nickname: payload.nickname,
       avatarUrl: "",
       mobile: payload.mobile,
-      companyName: payload.companyName
+      contactWechat: payload.contactWechat
     }
+  });
+}
+
+export function updateCustomerProfile(payload: { nickname: string; mobile: string; contactWechat: string }) {
+  return request<CustomerProfile>("/mini/profile", {
+    method: "PUT",
+    data: payload
   });
 }

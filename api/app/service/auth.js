@@ -12,19 +12,38 @@ class AuthService extends BaseService {
     return jwt.verify(token, this.config.jwt.secret);
   }
 
-  async miniLogin({ code, nickname = "微信客户", avatarUrl = "" }) {
+  async miniLogin({ code, nickname = "微信客户", avatarUrl = "", mobile = "", contactWechat = "" }) {
     const openid = `mock_${code || Date.now()}`;
     let customer = await this.first("SELECT * FROM customers WHERE openid = :openid AND deleted_at IS NULL", { openid });
     if (!customer) {
       const result = await this.execute(
-        `INSERT INTO customers(openid, nickname, avatar_url, status, source, created_at, updated_at)
-         VALUES(:openid, :nickname, :avatarUrl, 'normal', 'wechat_mini', NOW(), NOW())`,
-        { openid, nickname, avatarUrl }
+        `INSERT INTO customers(openid, nickname, avatar_url, mobile, contact_wechat, status, created_at, updated_at)
+         VALUES(:openid, :nickname, :avatarUrl, :mobile, :contactWechat, 'normal', NOW(), NOW())`,
+        { openid, nickname, avatarUrl, mobile, contactWechat }
       );
       customer = await this.first("SELECT * FROM customers WHERE id = :id", { id: result.insertId });
+    } else if (mobile || contactWechat) {
+      await this.execute(
+        "UPDATE customers SET mobile=COALESCE(NULLIF(:mobile,''), mobile), contact_wechat=COALESCE(NULLIF(:contactWechat,''), contact_wechat), updated_at=NOW() WHERE id=:id",
+        { id: customer.id, mobile, contactWechat }
+      );
+      customer = await this.first("SELECT * FROM customers WHERE id = :id", { id: customer.id });
     }
     const token = this.sign({ id: customer.id, type: "customer" });
     return { token, customer };
+  }
+
+  async updateCustomerProfile(customerId, payload) {
+    const data = {
+      nickname: payload.nickname || "",
+      mobile: payload.mobile || "",
+      contactWechat: payload.contactWechat || payload.contact_wechat || ""
+    };
+    await this.execute(
+      "UPDATE customers SET nickname=:nickname, mobile=:mobile, contact_wechat=:contactWechat, updated_at=NOW() WHERE id=:customerId AND deleted_at IS NULL",
+      { ...data, customerId }
+    );
+    return this.first("SELECT * FROM customers WHERE id=:customerId AND deleted_at IS NULL", { customerId });
   }
 
   async adminLogin({ username, password }) {

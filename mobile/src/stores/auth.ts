@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { mobileLogin, mobileRegister, type CustomerProfile } from "@/api/auth";
+import { mobileLogin, mobileRegister, updateCustomerProfile, type CustomerProfile } from "@/api/auth";
 import { tokenKey } from "@/api/http";
 
 const deviceKey = "source-shop-mobile-device";
@@ -34,9 +34,14 @@ export const useAuthStore = defineStore("auth", {
       const result = await mobileLogin({ account: payload.account || getDeviceId(), password: payload.password });
       this.persist(result.token, result.customer);
     },
-    async register(payload: { mobile: string; password?: string; nickname: string; companyName?: string }) {
+    async register(payload: { mobile: string; password?: string; nickname: string; contactWechat?: string }) {
       const result = await mobileRegister(payload);
-      this.persist(result.token, { ...result.customer, mobile: payload.mobile, companyName: payload.companyName });
+      this.persist(result.token, { ...result.customer, mobile: payload.mobile, contactWechat: payload.contactWechat });
+    },
+    async updateProfile(payload: { nickname: string; mobile: string; contactWechat: string }) {
+      const customer = await updateCustomerProfile(payload);
+      this.customer = customer;
+      localStorage.setItem(customerKey, JSON.stringify(customer));
     },
     async ensureGuestLogin() {
       if (this.token) return;

@@ -8,12 +8,15 @@ const props = defineProps<{
 }>();
 
 const title = computed(() => String(pickValue(props.item, "title", "name") || "未命名"));
-const subtitle = computed(() => String(pickValue(props.item, "subtitle") || "源码交付、部署支持、服务过程可追踪"));
+const subtitle = computed(() => {
+  if (props.type === "service") return String(pickValue(props.item, "subtitle") || "技术服务可预约沟通");
+  return String(pickValue(props.item, "featureIntro", "feature_intro") || "源码产品可预约沟通");
+});
 const cover = computed(() => String(pickValue(props.item, "coverUrl", "cover_url") || ""));
-const price = computed(() => pickValue(props.item, "priceText", "price_text") || formatMoney(pickValue(props.item, "startPrice", "start_price", "price")));
+const price = computed(() => formatMoney(pickValue(props.item, props.type === "service" ? "startPrice" : "price", props.type === "service" ? "start_price" : "price")));
 const meta = computed(() => {
-  if (props.type === "product") return String(pickValue(props.item, "techStack", "tech_stack") || "可演示");
-  return String(pickValue(props.item, "servicePeriod", "service_period") || "按需评估");
+  if (props.type === "product") return String(pickValue(props.item, "techStack", "tech_stack") || "可预约");
+  return String(pickValue(props.item, "serviceMethod", "service_method") || "按需沟通");
 });
 </script>
 

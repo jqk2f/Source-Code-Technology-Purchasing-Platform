@@ -44,8 +44,8 @@ class MiniController extends Controller {
   async createInquiry() {
     const user = this.ctx.state.user;
     const body = this.ctx.request.body || {};
-    if (!body.sourceType || !body.title) {
-      this.ctx.fail(400001, "来源类型和标题必填");
+    if (!["product", "service"].includes(body.sourceType) || !body.title) {
+      this.ctx.fail(400001, "来源和标题必填");
       return;
     }
     this.ctx.success(await this.ctx.service.inquiry.create(user.id, body));
@@ -55,35 +55,8 @@ class MiniController extends Controller {
     this.ctx.success(await this.ctx.service.inquiry.mine(this.ctx.state.user.id, this.ctx.query));
   }
 
-  async myOrders() {
-    this.ctx.success(await this.ctx.service.order.mine(this.ctx.state.user.id, this.ctx.query));
-  }
-
-  async createOrder() {
-    const body = this.ctx.request.body || {};
-    if (!["product", "service"].includes(body.sourceType) || !body.sourceId) {
-      this.ctx.fail(400001, "请选择要下单的商品或服务");
-      return;
-    }
-    this.ctx.success(await this.ctx.service.order.createDirect(this.ctx.state.user.id, body));
-  }
-
-  async orderDetail() {
-    const data = await this.ctx.service.order.detail(Number(this.ctx.params.id), this.ctx.state.user.id);
-    if (!data) {
-      this.ctx.fail(404001, "订单不存在", 404);
-      return;
-    }
-    this.ctx.success(data);
-  }
-
-  async uploadPaymentVoucher() {
-    const data = await this.ctx.service.order.addPayment(
-      Number(this.ctx.params.id),
-      this.ctx.state.user.id,
-      this.ctx.request.body || {}
-    );
-    this.ctx.success(data);
+  async updateProfile() {
+    this.ctx.success(await this.ctx.service.auth.updateCustomerProfile(this.ctx.state.user.id, this.ctx.request.body || {}));
   }
 }
 

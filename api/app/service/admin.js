@@ -18,30 +18,15 @@ const resources = {
     fields: [
       "categoryId",
       "title",
-      "subtitle",
-      "coverUrl",
       "price",
-      "originPrice",
-      "startPrice",
-      "priceText",
-      "isDeployIncluded",
-      "isCustomizable",
-      "hasDemo",
       "demoUrl",
-      "demoAccount",
       "techStack",
-      "frontendStack",
-      "backendStack",
-      "databaseStack",
-      "deployEnv",
       "featureIntro",
       "deliveryContent",
       "purchaseNotice",
-      "afterSaleDesc",
-      "licenseDesc",
       "status"
     ],
-    defaults: { status: "draft", viewCount: 0, favoriteCount: 0, dealCount: 0, sortNo: 0 }
+    defaults: { categoryId: 1, status: "draft", viewCount: 0, favoriteCount: 0, dealCount: 0, sortNo: 0 }
   },
   services: {
     table: "services",
@@ -51,28 +36,21 @@ const resources = {
       "categoryId",
       "name",
       "subtitle",
-      "coverUrl",
       "startPrice",
-      "priceText",
-      "servicePeriod",
       "serviceMethod",
       "serviceScope",
-      "serviceProcess",
-      "requiredMaterials",
       "deliveryStandard",
       "excludedContent",
-      "afterSaleDesc",
-      "responseTime",
       "status"
     ],
-    defaults: { status: "draft", viewCount: 0, favoriteCount: 0, dealCount: 0, sortNo: 0 }
+    defaults: { categoryId: 4, status: "draft", viewCount: 0, favoriteCount: 0, dealCount: 0, sortNo: 0 }
   },
   customers: {
     table: "customers",
     softDelete: true,
-    search: ["nickname", "mobile", "contact_wechat", "company_name"],
-    fields: ["openid", "mobile", "nickname", "avatarUrl", "companyName", "contactName", "contactWechat", "contactAddress", "source", "status", "remark"],
-    defaults: { status: "normal", source: "backend" }
+    search: ["nickname", "mobile", "contact_wechat"],
+    fields: ["openid", "mobile", "nickname", "avatarUrl", "contactName", "contactWechat", "contactAddress", "status", "remark"],
+    defaults: { status: "normal" }
   },
   inquiries: {
     table: "inquiries",
@@ -83,78 +61,15 @@ const resources = {
       "sourceType",
       "sourceId",
       "title",
-      "demandType",
       "description",
       "contactName",
       "contactMobile",
       "contactWechat",
-      "budgetMin",
-      "budgetMax",
-      "expectedFinishAt",
-      "quoteAmount",
-      "quoteDesc",
       "priority",
       "status",
       "nextFollowAt"
     ],
-    defaults: { inquiryNo: () => makeNo("INQ"), sourceType: "custom", priority: "normal", status: "pending_follow" }
-  },
-  orders: {
-    table: "orders",
-    softDelete: true,
-    search: ["order_no", "title"],
-    fields: [
-      "customerId",
-      "inquiryId",
-      "sourceType",
-      "title",
-      "totalAmount",
-      "discountAmount",
-      "extraAmount",
-      "payableAmount",
-      "paidAmount",
-      "paymentStatus",
-      "deliveryStatus",
-      "afterSaleStatus",
-      "status",
-      "paymentInstruction",
-      "customerRemark",
-      "internalRemark"
-    ],
-    defaults: {
-      orderNo: () => makeNo("ORD"),
-      sourceType: "manual",
-      totalAmount: 0,
-      discountAmount: 0,
-      extraAmount: 0,
-      payableAmount: 0,
-      paidAmount: 0,
-      paymentStatus: "unpaid",
-      deliveryStatus: "not_started",
-      afterSaleStatus: "none",
-      status: "pending_communication"
-    }
-  },
-  payments: {
-    table: "payment_records",
-    softDelete: false,
-    search: ["payment_no", "transaction_no", "remark"],
-    fields: ["orderId", "customerId", "amount", "paymentMethod", "paidAt", "receiverAccount", "transactionNo", "voucherFileId", "status", "remark"],
-    defaults: { paymentNo: () => makeNo("PAY"), status: "pending", paymentMethod: "wechat_transfer" }
-  },
-  deliveries: {
-    table: "delivery_records",
-    softDelete: false,
-    search: ["delivery_no", "title", "content"],
-    fields: ["orderId", "type", "title", "content", "attachments", "isCustomerVisible", "status"],
-    defaults: { deliveryNo: () => makeNo("DEL"), type: "netdisk", isCustomerVisible: 1, status: "pending" }
-  },
-  "after-sales": {
-    table: "after_sale_tickets",
-    softDelete: false,
-    search: ["ticket_no", "title", "description"],
-    fields: ["orderId", "customerId", "deliveryId", "type", "title", "description", "environment", "attachments", "status", "assigneeId", "result"],
-    defaults: { ticketNo: () => makeNo("AFT"), type: "other", status: "pending" }
+    defaults: { inquiryNo: () => makeNo("INQ"), sourceType: "product", priority: "normal", status: "pending_follow" }
   }
 };
 
@@ -162,24 +77,15 @@ class AdminService extends BaseService {
   async overview() {
     const todayCustomers = await this.first("SELECT COUNT(1) total FROM customers WHERE DATE(created_at)=CURDATE()");
     const todayInquiries = await this.first("SELECT COUNT(1) total FROM inquiries WHERE DATE(created_at)=CURDATE()");
-    const pendingInquiries = await this.first("SELECT COUNT(1) total FROM inquiries WHERE status IN ('pending_follow','contacted','pending_quote','quoted')");
-    const pendingPayments = await this.first("SELECT COUNT(1) total FROM orders WHERE status='payment_confirming'");
-    const pendingDeliveries = await this.first("SELECT COUNT(1) total FROM orders WHERE status='pending_delivery'");
-    const pendingAfterSales = await this.first("SELECT COUNT(1) total FROM after_sale_tickets WHERE status IN ('pending','processing','waiting_customer')");
-    const amount = await this.first("SELECT COALESCE(SUM(payable_amount),0) order_amount, COALESCE(SUM(paid_amount),0) paid_amount FROM orders WHERE deleted_at IS NULL");
-    const completedOrders = await this.first("SELECT COUNT(1) total FROM orders WHERE status='completed'");
+    const pendingInquiries = await this.first("SELECT COUNT(1) total FROM inquiries WHERE status='pending_follow'");
+    const contactedInquiries = await this.first("SELECT COUNT(1) total FROM inquiries WHERE status='contacted'");
     const inquiryTotal = await this.first("SELECT COUNT(1) total FROM inquiries");
     return {
       todayCustomers: Number(todayCustomers.total || 0),
       todayInquiries: Number(todayInquiries.total || 0),
       pendingInquiries: Number(pendingInquiries.total || 0),
-      pendingPayments: Number(pendingPayments.total || 0),
-      pendingDeliveries: Number(pendingDeliveries.total || 0),
-      pendingAfterSales: Number(pendingAfterSales.total || 0),
-      orderAmount: Number(amount.orderAmount || 0),
-      paidAmount: Number(amount.paidAmount || 0),
-      completedOrders: Number(completedOrders.total || 0),
-      conversionRate: Number(inquiryTotal.total || 0) ? Number(completedOrders.total || 0) / Number(inquiryTotal.total) : 0
+      contactedInquiries: Number(contactedInquiries.total || 0),
+      conversionRate: Number(inquiryTotal.total || 0) ? Number(contactedInquiries.total || 0) / Number(inquiryTotal.total) : 0
     };
   }
 
@@ -214,39 +120,6 @@ class AdminService extends BaseService {
       table: "customers",
       where: parts.join(" AND "),
       params,
-      orderBy: "created_at DESC",
-      page: query.page,
-      pageSize: query.pageSize
-    });
-  }
-
-  async payments(query) {
-    return this.page({
-      table: "payment_records",
-      where: query.status ? "status=:status" : "1=1",
-      params: { status: query.status },
-      orderBy: "created_at DESC",
-      page: query.page,
-      pageSize: query.pageSize
-    });
-  }
-
-  async deliveries(query) {
-    return this.page({
-      table: "delivery_records",
-      where: query.status ? "status=:status" : "1=1",
-      params: { status: query.status },
-      orderBy: "created_at DESC",
-      page: query.page,
-      pageSize: query.pageSize
-    });
-  }
-
-  async afterSales(query) {
-    return this.page({
-      table: "after_sale_tickets",
-      where: query.status ? "status=:status" : "1=1",
-      params: { status: query.status },
       orderBy: "created_at DESC",
       page: query.page,
       pageSize: query.pageSize

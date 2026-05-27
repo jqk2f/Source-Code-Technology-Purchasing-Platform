@@ -11,12 +11,12 @@ class InquiryService extends BaseService {
     const inquiryNo = makeNo("INQ");
     const result = await this.execute(
       `INSERT INTO inquiries(
-        inquiry_no, customer_id, source_type, source_id, title, demand_type, description,
-        contact_name, contact_mobile, contact_wechat, budget_min, budget_max, expected_finish_at,
+        inquiry_no, customer_id, source_type, source_id, title, description,
+        contact_name, contact_mobile, contact_wechat,
         priority, status, created_at, updated_at
       ) VALUES(
-        :inquiryNo, :customerId, :sourceType, :sourceId, :title, :demandType, :description,
-        :contactName, :contactMobile, :contactWechat, :budgetMin, :budgetMax, :expectedFinishAt,
+        :inquiryNo, :customerId, :sourceType, :sourceId, :title, :description,
+        :contactName, :contactMobile, :contactWechat,
         'normal', 'pending_follow', NOW(), NOW()
       )`,
       {
@@ -25,14 +25,10 @@ class InquiryService extends BaseService {
         sourceType: payload.sourceType,
         sourceId: payload.sourceId || null,
         title: payload.title,
-        demandType: payload.demandType || null,
         description: payload.description || "",
         contactName: payload.contactName || "",
         contactMobile: payload.contactMobile || "",
-        contactWechat: payload.contactWechat || "",
-        budgetMin: payload.budgetMin || null,
-        budgetMax: payload.budgetMax || null,
-        expectedFinishAt: payload.expectedFinishAt || null
+        contactWechat: payload.contactWechat || ""
       }
     );
     return { inquiryId: result.insertId, inquiryNo, status: "pending_follow" };
@@ -86,15 +82,6 @@ class InquiryService extends BaseService {
       nextFollowAt: payload.nextFollowAt || null
     });
     return { id };
-  }
-
-  async quote(id, payload) {
-    await this.execute("UPDATE inquiries SET quote_amount=:quoteAmount, quote_desc=:quoteDesc, status='quoted', updated_at=NOW() WHERE id=:id", {
-      id,
-      quoteAmount: payload.quoteAmount,
-      quoteDesc: payload.quoteDesc || ""
-    });
-    return { id, status: "quoted" };
   }
 }
 

@@ -36,9 +36,9 @@ async function submit() {
     <section class="p-12 flex flex-col justify-between">
       <div class="text-xl font-semibold text-brand">{{ theme.tokens.brandName }}</div>
       <div class="max-w-xl">
-        <h1 class="text-4xl font-bold leading-tight mb-5">源码产品与技术服务的运营工作台</h1>
+        <h1 class="text-4xl font-bold leading-tight mb-5">源码产品与技术服务管理后台</h1>
         <p class="text-gray-600 text-base leading-8">
-          维护商品服务、跟进询单、确认人工收款、安排交付和处理售后。所有核心流程都围绕个人运营场景展开。
+          维护商品服务，跟进客户预约和联系资料。当前版本聚焦预约沟通。
         </p>
       </div>
       <div class="text-sm text-gray-500">MVP 默认账号：admin / admin123</div>

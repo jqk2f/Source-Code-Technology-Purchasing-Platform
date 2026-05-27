@@ -8,25 +8,15 @@ const overview = ref<DashboardOverview>({
   todayCustomers: 0,
   todayInquiries: 0,
   pendingInquiries: 0,
-  pendingPayments: 0,
-  pendingDeliveries: 0,
-  pendingAfterSales: 0,
-  orderAmount: 0,
-  paidAmount: 0,
-  completedOrders: 0,
+  contactedInquiries: 0,
   conversionRate: 0
 });
 
 const cards = [
   ["今日新增客户", "todayCustomers"],
-  ["今日询单", "todayInquiries"],
-  ["待跟进询单", "pendingInquiries"],
-  ["待确认收款", "pendingPayments"],
-  ["待交付订单", "pendingDeliveries"],
-  ["售后待处理", "pendingAfterSales"],
-  ["订单金额", "orderAmount"],
-  ["确认收款金额", "paidAmount"],
-  ["成交订单数", "completedOrders"]
+  ["今日预约", "todayInquiries"],
+  ["待跟进预约", "pendingInquiries"],
+  ["已联系预约", "contactedInquiries"]
 ] as const;
 
 onMounted(async () => {
@@ -45,7 +35,7 @@ onMounted(async () => {
       <a-card v-for="[label, key] in cards" :key="key" class="rounded-theme">
         <div class="text-sm text-gray-500">{{ label }}</div>
         <div class="text-3xl font-semibold mt-3">
-          {{ key.includes("Amount") ? `￥${overview[key].toLocaleString()}` : overview[key] }}
+          {{ overview[key] }}
         </div>
       </a-card>
     </div>
@@ -54,8 +44,8 @@ onMounted(async () => {
       <a-alert
         type="info"
         show-icon
-        message="当前版本按人工确认交易设计"
-        description="请优先处理待跟进询单、待确认收款和待交付订单。所有敏感操作后续可继续沉淀到操作日志模块。"
+        message="当前版本以客户意向跟进为主"
+        description="请优先维护产品与服务详情，并及时处理客户预约和联系资料。"
       />
     </a-card>
   </a-spin>

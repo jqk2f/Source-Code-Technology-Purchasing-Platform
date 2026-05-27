@@ -38,13 +38,12 @@ onMounted(load);
     <section class="overview soft-card">
       <div>
         <div class="eyebrow">客户选购中心</div>
-        <h1>选源码、订服务，直接下单跟进</h1>
-        <!-- <p>从浏览商品、确认订单到付款交付，客户侧流程集中处理。</p> -->
+        <h1>浏览源码与服务，预约客服沟通</h1>
+        <p>查看价格、演示地址和交付内容后，可在详情页发起预约服务。</p>
       </div>
-      <!-- <van-button type="primary" size="small" icon="shopping-cart-o" @click="router.push('/products')">去选购</van-button> -->
     </section>
 
-    <van-grid :column-num="4" :border="false" class="module-grid">
+    <van-grid :column-num="3" :border="false" class="module-grid">
       <van-grid-item v-for="item in clientModules" :key="item.key" :icon="item.icon" :text="item.title" @click="router.push(item.route)" />
     </van-grid>
 

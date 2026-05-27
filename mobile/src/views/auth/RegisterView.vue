@@ -12,7 +12,7 @@ const loading = ref(false);
 const form = reactive({
   nickname: "",
   mobile: "",
-  companyName: "",
+  contactWechat: "",
   password: ""
 });
 
@@ -42,13 +42,13 @@ async function submit() {
     <section class="brand">
       <div class="brand-mark">技</div>
       <h1>{{ appName }}</h1>
-      <p>建立客户档案后，可持续追踪需求、订单、付款和服务进度。</p>
+      <p>建立客户档案后，可持续追踪咨询、预约和购买意向进度。</p>
     </section>
 
     <van-form class="auth-card soft-card" @submit="submit">
       <van-field v-model="form.nickname" name="nickname" label="称呼" placeholder="联系人姓名" clearable />
       <van-field v-model="form.mobile" name="mobile" label="手机号" type="tel" placeholder="用于项目沟通" clearable />
-      <van-field v-model="form.companyName" name="companyName" label="公司" placeholder="选填" clearable />
+      <van-field v-model="form.contactWechat" name="contactWechat" label="微信号" placeholder="选填" clearable />
       <van-field v-model="form.password" name="password" label="密码" type="password" placeholder="可留空" clearable />
       <div class="actions">
         <van-button block type="primary" native-type="submit" :loading="loading">注册并进入</van-button>

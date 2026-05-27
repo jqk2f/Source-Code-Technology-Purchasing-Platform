@@ -47,7 +47,7 @@ async function guestLogin() {
     <section class="brand">
       <div class="brand-mark">源</div>
       <h1>{{ appName }}</h1>
-      <p>源码选购、技术服务、询单报价、订单交付一站式移动端</p>
+      <p>源码选购、技术服务、咨询预约和购买意向登记</p>
     </section>
 
     <van-form class="auth-card soft-card" @submit="submit">

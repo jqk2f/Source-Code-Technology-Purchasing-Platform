@@ -3,14 +3,10 @@ import { computed, h } from "vue";
 import { RouterView, useRoute, useRouter } from "vue-router";
 import {
   Boxes,
-  ClipboardList,
-  CreditCard,
   Handshake,
   Home,
   LogOut,
-  PackageCheck,
   Settings,
-  ShoppingBag,
   UserRound,
   Wrench
 } from "lucide-vue-next";
@@ -27,10 +23,6 @@ const iconMap = {
   products: Boxes,
   services: Wrench,
   inquiries: Handshake,
-  orders: ShoppingBag,
-  payments: CreditCard,
-  deliveries: PackageCheck,
-  "after-sales": ClipboardList,
   customers: UserRound
 };
 
@@ -72,7 +64,7 @@ function logout() {
       <a-layout-header class="!bg-white !px-6 border-b border-[var(--theme-border)] flex items-center justify-between">
         <div>
           <div class="text-lg font-semibold">{{ route.meta.title || "管理后台" }}</div>
-          <div class="text-xs text-gray-500">人工收款、交付和售后闭环工作台</div>
+          <div class="text-xs text-gray-500">维护产品服务，跟进客户咨询、预约和购买意向</div>
         </div>
         <div class="flex items-center gap-3">
           <a-tag color="blue">{{ auth.user?.realName || auth.user?.username || "管理员" }}</a-tag>

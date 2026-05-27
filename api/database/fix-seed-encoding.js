@@ -21,15 +21,8 @@ async function main() {
     ["UPDATE admin_permissions SET name=? WHERE code='dashboard:view'", ["经营概览"]],
     ["UPDATE admin_permissions SET name=? WHERE code='product:view'", ["商品查看"]],
     ["UPDATE admin_permissions SET name=? WHERE code='service:view'", ["服务查看"]],
-    ["UPDATE admin_permissions SET name=? WHERE code='inquiry:view'", ["询单查看"]],
-    ["UPDATE admin_permissions SET name=? WHERE code='order:view'", ["订单查看"]],
-    ["UPDATE admin_permissions SET name=? WHERE code='payment:view'", ["收款查看"]],
-    ["UPDATE admin_permissions SET name=? WHERE code='delivery:view'", ["交付查看"]],
-    ["UPDATE admin_permissions SET name=? WHERE code='after_sale:view'", ["售后查看"]],
+    ["UPDATE admin_permissions SET name=? WHERE code='inquiry:view'", ["意向查看"]],
     ["UPDATE admin_permissions SET name=? WHERE code='customer:view'", ["客户查看"]],
-    ["UPDATE admin_permissions SET name=? WHERE code='payment:confirm'", ["确认收款"]],
-    ["UPDATE admin_permissions SET name=? WHERE code='delivery:create'", ["添加交付"]],
-    ["UPDATE admin_permissions SET name=? WHERE code='order:create'", ["创建订单"]],
     ["UPDATE categories SET name=? WHERE id=1", ["小程序源码"]],
     ["UPDATE categories SET name=? WHERE id=2", ["Web 系统源码"]],
     ["UPDATE categories SET name=? WHERE id=3", ["后台管理系统"]],
@@ -39,8 +32,8 @@ async function main() {
     [
       `UPDATE products
        SET title=?, subtitle=?, price_text=?, demo_account=?, tech_stack=?, frontend_stack=?, backend_stack=?,
-           deploy_env=?, feature_intro=?, feature_list=JSON_ARRAY('商品管理','订单管理','会员管理','营销配置'),
-           delivery_content=?, purchase_notice=?, after_sale_desc=?, license_desc=?
+           deploy_env=?, feature_intro=?, feature_list=JSON_ARRAY('商品管理','预约管理','会员管理','营销配置'),
+           delivery_content=?, purchase_notice=?, license_desc=?
        WHERE id=1`,
       [
         "商城小程序源码",
@@ -53,8 +46,7 @@ async function main() {
         "Node.js 18+, MySQL 8",
         "适合快速搭建商城、预约、会员等业务原型。",
         "源码包、数据库脚本、部署文档、使用说明",
-        "源码商品售出后按约定售后范围处理。",
-        "基础运行问题 7 天内协助处理。",
+        "源码资料交接方式和授权范围以沟通确认为准。",
         "允许自用和商用，不允许转卖源码。"
       ]
     ],
@@ -63,7 +55,7 @@ async function main() {
     [
       `UPDATE services
        SET name=?, subtitle=?, price_text=?, service_period=?, service_method=?, service_scope=?,
-           service_process=?, required_materials=?, delivery_standard=?, excluded_content=?, after_sale_desc=?, response_time=?
+           service_process=?, required_materials=?, delivery_standard=?, excluded_content=?, response_time=?
        WHERE id=1`,
       [
         "源码部署服务",
@@ -76,7 +68,6 @@ async function main() {
         "服务器、域名、源码包、数据库文件。",
         "系统可访问，核心页面可打开。",
         "不包含功能修改和长期运维。",
-        "交付后 3 天内处理部署相关问题。",
         "工作时间 2 小时内响应"
       ]
     ],

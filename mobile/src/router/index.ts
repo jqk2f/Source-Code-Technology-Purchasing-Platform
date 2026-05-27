@@ -15,11 +15,8 @@ const routes: RouteRecordRaw[] = [
       { path: "products/:id", component: () => import("@/views/catalog/CatalogDetailView.vue"), meta: { title: "源码详情", catalogType: "product" } },
       { path: "services", component: () => import("@/views/catalog/CatalogListView.vue"), meta: { title: "技术服务", catalogType: "service" } },
       { path: "services/:id", component: () => import("@/views/catalog/CatalogDetailView.vue"), meta: { title: "服务详情", catalogType: "service" } },
-      { path: "checkout", component: () => import("@/views/orders/OrderCreateView.vue"), meta: { title: "确认订单", auth: true } },
-      { path: "inquiries", component: () => import("@/views/inquiries/InquiryListView.vue"), meta: { title: "我的询单", auth: true } },
-      { path: "inquiries/create", component: () => import("@/views/inquiries/InquiryCreateView.vue"), meta: { title: "提交需求", auth: true } },
-      { path: "orders", component: () => import("@/views/orders/OrderListView.vue"), meta: { title: "我的订单", auth: true } },
-      { path: "orders/:id", component: () => import("@/views/orders/OrderDetailView.vue"), meta: { title: "订单详情", auth: true } },
+      { path: "inquiries", component: () => import("@/views/inquiries/InquiryListView.vue"), meta: { title: "我的预约", auth: true } },
+      { path: "inquiries/create", component: () => import("@/views/inquiries/InquiryCreateView.vue"), meta: { title: "预约服务", auth: true } },
       { path: "profile", component: () => import("@/views/ProfileView.vue"), meta: { title: "我的", auth: true } }
     ]
   }

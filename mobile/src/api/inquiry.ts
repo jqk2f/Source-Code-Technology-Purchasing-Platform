@@ -2,17 +2,13 @@ import type { PageResult } from "@/shared";
 import { request } from "./http";
 
 export interface InquiryPayload {
-  sourceType: "product" | "service" | "custom" | "bundle";
+  sourceType: "product" | "service";
   sourceId?: number;
   title: string;
-  demandType?: string;
   description?: string;
   contactName?: string;
   contactMobile?: string;
   contactWechat?: string;
-  budgetMin?: number;
-  budgetMax?: number;
-  expectedFinishAt?: string;
   options?: Record<string, unknown>;
 }
 
